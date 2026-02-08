@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { AppEnv } from '../types';
 import { createAccessMiddleware } from '../auth';
 import { ensureMoltbotGateway, findExistingMoltbotProcess, mountR2Storage, syncToR2, waitForProcess } from '../gateway';
+import { executeMissionTask, validateMissionRequest } from '../gateway/mission';
 import { R2_MOUNT_PATH } from '../config';
 
 // CLI commands can take 10-15 seconds to complete due to WebSocket connection overhead
@@ -280,5 +281,70 @@ adminApi.post('/gateway/restart', async (c) => {
 
 // Mount admin API routes under /admin
 api.route('/admin', adminApi);
+
+// =============================================================================
+// MISSION CONTROL ROUTES
+// =============================================================================
+
+/**
+ * Mission API routes - protected by Cloudflare Access
+ * Used by Mission Control to execute tasks via this MoltWorker
+ */
+const missionApi = new Hono<AppEnv>();
+
+// Middleware: Verify Cloudflare Access JWT for mission routes
+missionApi.use('*', createAccessMiddleware({ type: 'json' }));
+
+/**
+ * POST /api/mission/execute - Execute a task for Mission Control
+ *
+ * This endpoint receives a task from Mission Control and executes it
+ * using the agent's soul content as context.
+ */
+missionApi.post('/execute', async (c) => {
+  const sandbox = c.get('sandbox');
+
+  try {
+    const body = await c.req.json();
+    const validation = validateMissionRequest(body);
+
+    if (!validation.valid) {
+      return c.json({ success: false, error: validation.error }, 400);
+    }
+
+    console.log(`[mission] Received task ${validation.request.task_id} for agent ${validation.request.agent_id}`);
+
+    const result = await executeMissionTask(sandbox, c.env, validation.request);
+
+    return c.json(result);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[mission] Execute error:', error);
+    return c.json({ success: false, error: errorMessage }, 500);
+  }
+});
+
+/**
+ * GET /api/mission/status - Get MoltWorker status for Mission Control
+ */
+missionApi.get('/status', async (c) => {
+  const sandbox = c.get('sandbox');
+
+  try {
+    const existingProcess = await findExistingMoltbotProcess(sandbox);
+
+    return c.json({
+      gateway_running: existingProcess !== null && existingProcess.status === 'running',
+      gateway_process_id: existingProcess?.id,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return c.json({ error: errorMessage }, 500);
+  }
+});
+
+// Mount mission API routes under /mission
+api.route('/mission', missionApi);
 
 export { api };

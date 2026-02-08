@@ -259,7 +259,9 @@ if (isOpenAI) {
         baseUrl: baseUrl,
         api: 'anthropic-messages',
         models: [
-            { id: 'claude-haiku-4-5-20251101', name: 'Claude Opus 4.5', contextWindow: 200000 },
+            // Opus 4.6 - Leadership tier (Architect + Jarvis) - 1M context
+            { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', contextWindow: 1000000 },
+            // Sonnet 4.5 - Implementation tier (Backend, Frontend, Reviewer)
             { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', contextWindow: 200000 },
             { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', contextWindow: 200000 },
         ]
@@ -271,13 +273,48 @@ if (isOpenAI) {
     config.models.providers.anthropic = providerConfig;
     // Add models to the allowlist so they appear in /models
     config.agents.defaults.models = config.agents.defaults.models || {};
-    config.agents.defaults.models['anthropic/claude-haiku-4-5-20251101'] = { alias: 'Opus 4.5' };
+    config.agents.defaults.models['anthropic/claude-opus-4-6'] = { alias: 'Opus 4.6' };
     config.agents.defaults.models['anthropic/claude-sonnet-4-5-20250929'] = { alias: 'Sonnet 4.5' };
     config.agents.defaults.models['anthropic/claude-haiku-4-5-20251001'] = { alias: 'Haiku 4.5' };
-    config.agents.defaults.model.primary = 'anthropic/claude-haiku-4-5-20251101';
+    // Default to Sonnet 4.5 for general tasks; leadership agents override this
+    config.agents.defaults.model.primary = 'anthropic/claude-sonnet-4-5-20250929';
 } else {
     // Default to Anthropic without custom base URL (uses built-in pi-ai catalog)
     config.agents.defaults.model.primary = 'anthropic/claude-haiku-4-5';
+}
+
+// ============================================================
+// MOONSHOT/KIMI CONFIGURATION (for cost-efficient heartbeats)
+// ============================================================
+// If MOONSHOT_API_KEY is set, configure the moonshot provider
+// This enables using Kimi K2.5 for heartbeat checks (much cheaper than Opus)
+if (process.env.MOONSHOT_API_KEY) {
+    console.log('Configuring Moonshot/Kimi provider for heartbeats');
+    config.models = config.models || {};
+    config.models.providers = config.models.providers || {};
+    config.models.providers.moonshot = {
+        baseUrl: 'https://api.moonshot.cn/v1',
+        apiKey: process.env.MOONSHOT_API_KEY,
+        api: 'openai-chat',
+        models: [
+            { id: 'kimi-k2-0711-preview', name: 'Kimi K2.5', contextWindow: 131072 },
+            { id: 'moonshot-v1-128k', name: 'Moonshot V1 128K', contextWindow: 128000 },
+        ]
+    };
+    // Add moonshot models to allowlist
+    config.agents.defaults.models = config.agents.defaults.models || {};
+    config.agents.defaults.models['moonshot/kimi-k2-0711-preview'] = { alias: 'Kimi K2.5' };
+    config.agents.defaults.models['moonshot/moonshot-v1-128k'] = { alias: 'Moonshot V1' };
+
+    // Configure heartbeat to use the cheaper Kimi model
+    // This saves significant costs for routine status checks
+    config.agents.defaults.heartbeat = config.agents.defaults.heartbeat || {};
+    config.agents.defaults.heartbeat.model = 'moonshot/kimi-k2-0711-preview';
+    config.agents.defaults.heartbeat.every = '30m';
+    config.agents.defaults.heartbeat.activeHours = {
+        start: '08:00',
+        end: '22:00'
+    };
 }
 
 // Write updated config

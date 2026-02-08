@@ -56,6 +56,8 @@ export function buildEnvVars(env: MoltbotEnv): Record<string, string> {
   if (env.CDP_SECRET) envVars.CDP_SECRET = env.CDP_SECRET;
   if (env.WORKER_URL) envVars.WORKER_URL = env.WORKER_URL;
   if (env.BRAVE_API_KEY) envVars.BRAVE_API_KEY = env.BRAVE_API_KEY;
+  if (env.MOONSHOT_API_KEY) envVars.MOONSHOT_API_KEY = env.MOONSHOT_API_KEY;
+  if (env.MISSION_CONTROL_URL) envVars.MISSION_CONTROL_URL = env.MISSION_CONTROL_URL;
 
   return envVars;
 }

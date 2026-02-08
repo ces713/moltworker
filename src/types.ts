@@ -15,6 +15,8 @@ export interface MoltbotEnv {
   ANTHROPIC_BASE_URL?: string;
   OPENAI_API_KEY?: string;
   BRAVE_API_KEY?: string;
+  MOONSHOT_API_KEY?: string; // Moonshot/Kimi API key for cost-efficient heartbeats
+  MISSION_CONTROL_URL?: string; // Mission Control Worker URL
   MOLTBOT_GATEWAY_TOKEN?: string; // Gateway token (mapped to CLAWDBOT_GATEWAY_TOKEN for container)
 
   CLAWDBOT_BIND_MODE?: string;
