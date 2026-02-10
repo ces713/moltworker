@@ -1,0 +1,120 @@
+# Agile Sprint Methodology
+# 2-week sprint cycles with iterative delivery
+
+id: agile-sprint
+name: Agile Sprint
+description: 2-week sprint cycles with daily standups and iterative delivery
+problem_types:
+  - software-development
+  - product-development
+
+phases:
+  - id: planning
+    name: Sprint Planning
+    order: 1
+    agents: [jarvis]
+    deliverables:
+      - Sprint backlog with prioritized tasks
+      - Acceptance criteria for each task
+      - Effort estimates
+    gate:
+      approver: jarvis
+      criteria: All tasks have clear acceptance criteria and estimates
+
+  - id: architecture
+    name: Technical Design
+    order: 2
+    agents: [architect]
+    depends_on: [planning]
+    deliverables:
+      - Technical spec or ADR for complex features
+      - API contracts (if applicable)
+      - Data model changes
+    gate:
+      approver: jarvis
+      criteria: Design reviewed and approved, no blocking questions
+
+  - id: implementation
+    name: Development
+    order: 3
+    agents: [backend, frontend]
+    parallel: true
+    depends_on: [architecture]
+    deliverables:
+      - Working code
+      - Unit tests (where applicable)
+      - Updated documentation
+    gate:
+      approver: reviewer
+      criteria: Code review passed, tests passing
+
+  - id: security
+    name: Security Review
+    order: 4
+    agents: [hawk]
+    depends_on: [implementation]
+    optional: true
+    trigger: security-sensitive changes
+    deliverables:
+      - Security assessment
+      - Vulnerability report (if issues found)
+    gate:
+      approver: hawk
+      criteria: No critical/high vulnerabilities
+
+  - id: review
+    name: Final Review
+    order: 5
+    agents: [reviewer]
+    depends_on: [implementation]
+    deliverables:
+      - QA signoff
+      - Demo readiness confirmation
+    gate:
+      approver: jarvis
+      criteria: All acceptance criteria met, demo-ready
+
+  - id: deploy
+    name: Deployment
+    order: 6
+    agents: [jarvis]
+    depends_on: [review]
+    deliverables:
+      - Deployed to staging/production
+      - Release notes
+
+task_templates:
+  - phase: planning
+    subject: "[Sprint] Plan sprint {sprint_number}"
+    priority: 9
+    description: |
+      Plan the sprint: review backlog, prioritize items, estimate effort.
+      Create tasks for each deliverable with clear acceptance criteria.
+
+  - phase: architecture
+    subject: "[Design] {feature_name} technical spec"
+    priority: 8
+    description: |
+      Create technical specification for {feature_name}.
+      Include API design, data model, integration points.
+
+  - phase: implementation
+    subject: "[Impl] {feature_name} - {component}"
+    priority: 7
+    description: |
+      Implement {feature_name} in the {component} component.
+      Follow the technical spec from the architecture phase.
+
+  - phase: security
+    subject: "[Security] Review {feature_name}"
+    priority: 7
+    description: |
+      Security review of {feature_name}.
+      Check for OWASP top 10, auth/authz, data handling.
+
+  - phase: review
+    subject: "[Review] {feature_name} final QA"
+    priority: 6
+    description: |
+      Final review of {feature_name}.
+      Verify all acceptance criteria, test edge cases.

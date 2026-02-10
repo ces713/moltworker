@@ -1,0 +1,95 @@
+# Business Process Improvement Methodology
+# DMAIC-inspired approach for process optimization
+
+id: business-process
+name: Process Improvement
+description: DMAIC-inspired process improvement - Define, Measure, Analyze, Improve, Control
+problem_types:
+  - business-process
+  - operations
+  - optimization
+
+phases:
+  - id: define
+    name: Define
+    order: 1
+    agents: [jarvis]
+    deliverables:
+      - Problem statement
+      - Process scope and boundaries
+      - Stakeholder identification
+      - Success metrics
+    gate:
+      approver: jarvis
+      criteria: Clear problem definition, stakeholders aligned
+
+  - id: measure
+    name: Measure
+    order: 2
+    agents: [architect]
+    depends_on: [define]
+    deliverables:
+      - Current process documentation
+      - Baseline metrics
+      - Data collection plan
+    gate:
+      criteria: Baseline established, data reliable
+
+  - id: analyze
+    name: Analyze
+    order: 3
+    agents: [architect, reviewer]
+    depends_on: [measure]
+    deliverables:
+      - Root cause analysis
+      - Process bottlenecks identified
+      - Opportunity areas
+    gate:
+      approver: jarvis
+      criteria: Root causes validated, priorities clear
+
+  - id: improve
+    name: Improve
+    order: 4
+    agents: [backend, frontend]
+    depends_on: [analyze]
+    deliverables:
+      - Solution design
+      - Pilot implementation
+      - Results from pilot
+    gate:
+      approver: jarvis
+      criteria: Solution demonstrates improvement
+
+  - id: control
+    name: Control
+    order: 5
+    agents: [jarvis]
+    depends_on: [improve]
+    deliverables:
+      - Standard operating procedures
+      - Monitoring dashboard
+      - Training materials
+    gate:
+      criteria: Process stable, improvements sustained
+
+task_templates:
+  - phase: define
+    subject: "[PROCESS] Define: {process_name}"
+    priority: 8
+
+  - phase: measure
+    subject: "[PROCESS] Measure: {process_name} baseline"
+    priority: 7
+
+  - phase: analyze
+    subject: "[PROCESS] Analyze: {process_name} root causes"
+    priority: 7
+
+  - phase: improve
+    subject: "[PROCESS] Improve: {process_name} implementation"
+    priority: 8
+
+  - phase: control
+    subject: "[PROCESS] Control: {process_name} standardization"
+    priority: 6

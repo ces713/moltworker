@@ -1,0 +1,79 @@
+# Kanban Methodology
+# Continuous flow with WIP limits
+
+id: kanban
+name: Kanban
+description: Continuous flow with WIP limits and pull-based task assignment
+problem_types:
+  - software-development
+  - support
+  - operations
+
+settings:
+  wip_limit: 3          # Max tasks per agent in progress
+  review_required: true
+  security_review: on-demand
+
+phases:
+  - id: backlog
+    name: Backlog
+    order: 1
+    agents: [jarvis]
+    description: Tasks waiting to be pulled
+    deliverables:
+      - Prioritized task with clear definition
+
+  - id: ready
+    name: Ready
+    order: 2
+    agents: []
+    description: Tasks ready to be worked on
+    gate:
+      criteria: Task has acceptance criteria and is unblocked
+
+  - id: in_progress
+    name: In Progress
+    order: 3
+    agents: [backend, frontend, architect]
+    parallel: true
+    wip_limit: 3
+    deliverables:
+      - Working implementation
+    gate:
+      criteria: Implementation complete, ready for review
+
+  - id: review
+    name: Review
+    order: 4
+    agents: [reviewer, hawk]
+    deliverables:
+      - Code review approval
+      - Security clearance (if needed)
+    gate:
+      approver: reviewer
+      criteria: Code meets quality standards
+
+  - id: done
+    name: Done
+    order: 5
+    agents: [jarvis]
+    description: Completed and deployed
+    deliverables:
+      - Merged to main branch
+      - Deployed (if applicable)
+
+task_templates:
+  - phase: in_progress
+    subject: "{task_type}: {description}"
+    priority: 5
+    description: |
+      {full_description}
+
+      Acceptance criteria:
+      {acceptance_criteria}
+
+flow_rules:
+  - Pull tasks from Ready when you complete current work
+  - Don't exceed WIP limit
+  - Block on review if quality issues found
+  - Escalate blockers to Jarvis within 4 hours

@@ -41,6 +41,31 @@ export function extractJWT(c: Context<AppEnv>): string | null {
 }
 
 /**
+ * Check if request has valid Mission Control shared secret
+ * Used for worker-to-worker communication which bypasses CF Access edge
+ */
+export function hasMissionControlSecret(c: Context<AppEnv>): boolean {
+  const secret = c.env.MISSION_CONTROL_SECRET;
+  const headerSecret = c.req.header('X-Mission-Control-Secret');
+
+  console.log(`[auth] Checking Mission Control secret: env_configured=${!!secret}, header_present=${!!headerSecret}`);
+
+  if (!secret) {
+    console.log('[auth] MISSION_CONTROL_SECRET not configured in environment');
+    return false;
+  }
+
+  if (!headerSecret) {
+    console.log('[auth] X-Mission-Control-Secret header not present in request');
+    return false;
+  }
+
+  const matches = headerSecret === secret;
+  console.log(`[auth] Secret match: ${matches}`);
+  return matches;
+}
+
+/**
  * Create a Cloudflare Access authentication middleware
  *
  * @param options - Middleware options
@@ -53,6 +78,15 @@ export function createAccessMiddleware(options: AccessMiddlewareOptions) {
     // Skip auth in dev mode or E2E test mode
     if (isDevMode(c.env) || isE2ETestMode(c.env)) {
       c.set('accessUser', { email: 'dev@localhost', name: 'Dev User' });
+      return next();
+    }
+
+    // Allow Mission Control worker-to-worker requests with shared secret
+    // (Worker-to-worker fetch bypasses CF Access edge validation)
+    console.log(`[auth] Checking request to ${c.req.path}`);
+    if (hasMissionControlSecret(c)) {
+      console.log('[auth] Mission Control secret validated, allowing request');
+      c.set('accessUser', { email: 'mission-control@internal', name: 'Mission Control' });
       return next();
     }
 

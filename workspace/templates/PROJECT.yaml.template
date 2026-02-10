@@ -1,0 +1,84 @@
+# PROJECT.yaml - Project Configuration Template
+# This file defines a project for Mission Control orchestration.
+#
+# Usage:
+# 1. Copy this template to your project
+# 2. Fill in the values
+# 3. POST to /api/projects/init with: { "config": <this-file-content> }
+#    Or use: curl -X POST .../api/projects/init -d '{"config": {...}}'
+#
+# To get this template as JSON: GET /api/projects/template
+# To get this template as YAML: GET /api/projects/template?format=yaml
+
+id: my-project                    # Unique identifier (lowercase, no spaces)
+name: My Project                  # Display name
+description: A brief description of what this project does
+status: active                    # active | paused | completed | archived
+
+scope:
+  type: poc                       # poc | mvp | production
+  quality_bar: Demonstrates core functionality. Shortcuts acceptable for non-core features.
+  timeline: Q2 2025               # Optional target completion
+
+# What the project scope types mean:
+# - poc: Proof of concept/demo. Focus on core functionality, shortcuts OK.
+# - mvp: Minimum viable product. Core features complete, basic error handling.
+# - production: Full production quality. Security hardened, tested, documented.
+
+tech_stack:
+  - Technology 1 (e.g., FastAPI)
+  - Technology 2 (e.g., React)
+  - Technology 3 (e.g., PostgreSQL)
+
+agents:
+  # Which agents work on this project
+  assigned: [jarvis, architect, backend, frontend, reviewer, hawk]
+
+  # Lead agent has final authority on decisions
+  lead: jarvis
+
+  # Optional: Override default models for specific agents
+  # Default tiers: Leadership (Opus 4.6), Implementation (Sonnet 4.5)
+  # models:
+  #   architect: anthropic/claude-opus-4-6
+  #   backend: anthropic/claude-sonnet-4-5-20250929
+
+goals:
+  current_phase: Planning         # Current project phase
+  mission: Build a working proof of concept that demonstrates...
+  next_milestone: Technical specification complete  # Optional
+  objectives:
+    - First objective (what needs to be built/achieved)
+    - Second objective
+    - Third objective
+
+repository:
+  url: https://github.com/your-username/your-repo
+  branch: main                    # Default branch
+
+# =============================================================================
+# WHAT GETS GENERATED
+# =============================================================================
+# When you initialize a project with this config, Mission Control generates:
+#
+# 1. Database record in `projects` table
+# 2. R2 files:
+#    - projects/{id}/PROJECT.yaml  - This config file
+#    - projects/{id}/CONTEXT.md    - Working context for agents
+#    - projects/{id}/ACCESS.md     - Agent access rules
+#
+# Agents read CONTEXT.md to understand:
+# - What they're building (mission, objectives)
+# - Quality expectations (scope type)
+# - Current phase and recent decisions
+#
+# =============================================================================
+# API ENDPOINTS
+# =============================================================================
+# POST /api/projects/init           - Create project from this config
+# GET  /api/projects/:id/config     - Get current config (JSON or YAML)
+# PATCH /api/projects/:id/config    - Update config (partial updates OK)
+# POST /api/projects/:id/sync       - Regenerate R2 files from config
+# GET  /api/projects/:id/files      - List project files in R2
+# GET  /api/projects/:id/context    - Get CONTEXT.md content
+# GET  /api/projects/template       - Get this template

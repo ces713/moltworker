@@ -1,0 +1,100 @@
+# Waterfall Methodology
+# Sequential phases with strict gates
+
+id: waterfall
+name: Waterfall
+description: Sequential phases with gates - requirements, design, implementation, testing, deployment
+problem_types:
+  - software-development
+  - enterprise
+  - compliance-required
+
+phases:
+  - id: requirements
+    name: Requirements
+    order: 1
+    agents: [jarvis]
+    deliverables:
+      - Complete requirements document
+      - User stories with acceptance criteria
+      - Scope definition
+    gate:
+      approver: jarvis
+      criteria: All requirements documented and stakeholder-approved
+
+  - id: design
+    name: System Design
+    order: 2
+    agents: [architect]
+    depends_on: [requirements]
+    deliverables:
+      - Architecture document
+      - API specifications
+      - Database schema
+      - Component diagrams
+    gate:
+      approver: jarvis
+      criteria: Design covers all requirements, no ambiguities
+
+  - id: implementation
+    name: Implementation
+    order: 3
+    agents: [backend, frontend]
+    depends_on: [design]
+    parallel: true
+    deliverables:
+      - Complete codebase
+      - Unit tests
+      - Integration points
+    gate:
+      approver: reviewer
+      criteria: All code complete, unit tests passing
+
+  - id: testing
+    name: Testing
+    order: 4
+    agents: [reviewer, hawk]
+    depends_on: [implementation]
+    deliverables:
+      - Test results
+      - Security audit report
+      - Bug list (if any)
+    gate:
+      approver: jarvis
+      criteria: All critical/high bugs resolved, security approved
+
+  - id: deployment
+    name: Deployment
+    order: 5
+    agents: [jarvis]
+    depends_on: [testing]
+    deliverables:
+      - Production deployment
+      - Release documentation
+      - Runbook
+
+task_templates:
+  - phase: requirements
+    subject: "[REQ] Document requirements for {feature}"
+    priority: 9
+
+  - phase: design
+    subject: "[DESIGN] System design for {feature}"
+    priority: 8
+
+  - phase: implementation
+    subject: "[IMPL] Implement {component} for {feature}"
+    priority: 7
+
+  - phase: testing
+    subject: "[TEST] Test {feature}"
+    priority: 7
+
+  - phase: deployment
+    subject: "[DEPLOY] Deploy {feature} to {environment}"
+    priority: 8
+
+strict_rules:
+  - No phase can start until previous phase gate is passed
+  - Changes to requirements require re-approval
+  - Design changes during implementation require architecture review

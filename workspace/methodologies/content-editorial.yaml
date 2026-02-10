@@ -1,0 +1,97 @@
+# Editorial Workflow Methodology
+# Content creation and publication pipeline
+
+id: content-editorial
+name: Editorial Workflow
+description: Content creation pipeline - draft, review, edit, approve, publish
+problem_types:
+  - content-generation
+  - documentation
+  - marketing
+
+phases:
+  - id: ideation
+    name: Ideation
+    order: 1
+    agents: [jarvis]
+    deliverables:
+      - Content brief
+      - Target audience
+      - Key messages
+      - SEO keywords (if applicable)
+    gate:
+      approver: jarvis
+      criteria: Brief approved, resources allocated
+
+  - id: draft
+    name: Draft
+    order: 2
+    agents: [backend, frontend]  # Could be any agent with writing skills
+    depends_on: [ideation]
+    deliverables:
+      - First draft
+      - Supporting materials (images, data)
+    gate:
+      criteria: Draft complete, follows brief
+
+  - id: review
+    name: Editorial Review
+    order: 3
+    agents: [reviewer]
+    depends_on: [draft]
+    deliverables:
+      - Review feedback
+      - Factual accuracy check
+      - Style guide compliance
+    gate:
+      approver: reviewer
+      criteria: Content meets quality standards
+
+  - id: revision
+    name: Revision
+    order: 4
+    agents: [backend, frontend]
+    depends_on: [review]
+    optional: true
+    trigger: review feedback requires changes
+    deliverables:
+      - Revised content
+    gate:
+      criteria: All review feedback addressed
+
+  - id: approval
+    name: Final Approval
+    order: 5
+    agents: [jarvis]
+    depends_on: [review]
+    deliverables:
+      - Approval sign-off
+    gate:
+      approver: jarvis
+      criteria: Content approved for publication
+
+  - id: publish
+    name: Publish
+    order: 6
+    agents: [jarvis]
+    depends_on: [approval]
+    deliverables:
+      - Published content
+      - Distribution plan executed
+
+task_templates:
+  - phase: ideation
+    subject: "[CONTENT] Plan: {content_title}"
+    priority: 7
+
+  - phase: draft
+    subject: "[CONTENT] Draft: {content_title}"
+    priority: 6
+
+  - phase: review
+    subject: "[CONTENT] Review: {content_title}"
+    priority: 6
+
+  - phase: publish
+    subject: "[CONTENT] Publish: {content_title}"
+    priority: 7

@@ -1,0 +1,38 @@
+# PROJECT.yaml - Lifebot Project Configuration
+# This file defines the project for Mission Control orchestration.
+
+id: lifebot
+name: Lifebot PoC
+description: AI-powered Chrome extension + backend for WhatsApp management
+status: active
+
+scope:
+  type: poc
+  quality_bar: Demonstrates core message interception and priority scoring. Shortcuts acceptable for non-core features.
+  timeline: Q2 2025
+
+tech_stack:
+  - Chrome Extension (Manifest V3)
+  - FastAPI (Python 3.11+)
+  - SQLite (PoC) / PostgreSQL (production)
+  - Claude Sonnet 4 (AI prioritization)
+  - Cloudflare Workers (orchestration)
+
+agents:
+  assigned: [jarvis, architect, backend, frontend, reviewer, hawk]
+  lead: jarvis
+  # Using default model tiers
+
+goals:
+  current_phase: Pre-development
+  mission: Build a working PoC demonstrating WhatsApp message interception and AI-powered priority scoring
+  next_milestone: Technical specification complete
+  objectives:
+    - Chrome extension intercepts WhatsApp Web messages via API interception
+    - Backend processes and scores messages using Claude API
+    - Priority scores visible in extension UI
+    - Basic emotional content filtering (Emotional Shield demo)
+
+repository:
+  url: https://github.com/ces713/lifebot
+  branch: main

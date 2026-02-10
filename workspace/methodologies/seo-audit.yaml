@@ -1,0 +1,127 @@
+# SEO Audit Methodology
+# Technical and content SEO audit with prioritized recommendations
+
+id: seo-audit
+name: SEO Audit
+description: Technical and content SEO audit with prioritized recommendations
+problem_types:
+  - seo
+  - website-optimization
+  - content
+
+phases:
+  - id: technical
+    name: Technical Audit
+    order: 1
+    agents: [architect]
+    parallel: false
+    deliverables:
+      - Site crawl report
+      - Core Web Vitals analysis
+      - Mobile usability report
+      - Indexation issues
+      - Site structure analysis
+    gate:
+      criteria: Technical audit complete
+
+  - id: content
+    name: Content Audit
+    order: 2
+    agents: [reviewer]
+    parallel: true
+    deliverables:
+      - Content inventory
+      - Keyword gap analysis
+      - Content quality assessment
+      - Duplicate content check
+    gate:
+      criteria: Content audit complete
+
+  - id: competitive
+    name: Competitive Analysis
+    order: 3
+    agents: [architect]
+    parallel: true
+    deliverables:
+      - Competitor keyword analysis
+      - Backlink comparison
+      - Content gap opportunities
+    gate:
+      criteria: Competitive analysis complete
+
+  - id: recommendations
+    name: Recommendations
+    order: 4
+    agents: [jarvis]
+    depends_on: [technical, content, competitive]
+    deliverables:
+      - Prioritized action items
+      - Quick wins list
+      - Long-term strategy
+      - Resource estimates
+    gate:
+      approver: jarvis
+      criteria: Recommendations reviewed and prioritized
+
+  - id: implementation
+    name: Implementation
+    order: 5
+    agents: [backend, frontend]
+    depends_on: [recommendations]
+    deliverables:
+      - Technical fixes implemented
+      - Content optimizations
+      - New content created
+    gate:
+      criteria: Priority items implemented
+
+  - id: monitoring
+    name: Monitoring
+    order: 6
+    agents: [jarvis]
+    depends_on: [implementation]
+    deliverables:
+      - Tracking dashboard
+      - Monthly report template
+      - Alert setup
+    gate:
+      criteria: Monitoring in place
+
+task_templates:
+  - phase: technical
+    subject: "[SEO] Technical audit: {site_name}"
+    priority: 8
+
+  - phase: content
+    subject: "[SEO] Content audit: {site_name}"
+    priority: 7
+
+  - phase: recommendations
+    subject: "[SEO] Recommendations: {site_name}"
+    priority: 8
+
+  - phase: implementation
+    subject: "[SEO] Fix: {issue_type}"
+    priority: 7
+
+audit_checklist:
+  technical:
+    - Site speed (Core Web Vitals)
+    - Mobile-friendliness
+    - HTTPS/security
+    - XML sitemap
+    - Robots.txt
+    - Canonical tags
+    - Structured data
+    - Internal linking
+    - 404 errors
+    - Redirect chains
+
+  content:
+    - Title tags
+    - Meta descriptions
+    - Header structure
+    - Keyword usage
+    - Content freshness
+    - Thin content
+    - Duplicate content

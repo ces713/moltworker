@@ -22,6 +22,7 @@ export interface MoltbotEnv {
   BRAVE_API_KEY?: string;
   MOONSHOT_API_KEY?: string; // Moonshot/Kimi API key for cost-efficient heartbeats
   MISSION_CONTROL_URL?: string; // Mission Control Worker URL
+  MISSION_CONTROL_SECRET?: string; // Shared secret for Mission Control worker-to-worker auth
   MOLTBOT_GATEWAY_TOKEN?: string; // Gateway token (mapped to OPENCLAW_GATEWAY_TOKEN for container)
   OPENCLAW_BIND_MODE?: string;
   DEV_MODE?: string; // Set to 'true' for local dev (skips CF Access auth + openclaw device pairing)

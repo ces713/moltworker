@@ -1,0 +1,93 @@
+# Marketing Campaign Methodology
+# Campaign lifecycle from strategy to measurement
+
+id: marketing-campaign
+name: Marketing Campaign
+description: Campaign lifecycle - strategy, creative, review, launch, measure
+problem_types:
+  - marketing
+  - launch
+  - advertising
+
+phases:
+  - id: strategy
+    name: Strategy
+    order: 1
+    agents: [jarvis]
+    deliverables:
+      - Campaign objectives
+      - Target audience definition
+      - Key messages
+      - Channel selection
+      - Budget allocation
+      - Timeline
+    gate:
+      approver: jarvis
+      criteria: Strategy approved, budget confirmed
+
+  - id: creative
+    name: Creative Development
+    order: 2
+    agents: [frontend]
+    depends_on: [strategy]
+    deliverables:
+      - Creative brief
+      - Copy/content
+      - Visual assets
+      - Landing pages (if needed)
+    gate:
+      criteria: All assets created, brand-compliant
+
+  - id: review
+    name: Review & Approval
+    order: 3
+    agents: [reviewer]
+    depends_on: [creative]
+    deliverables:
+      - Legal/compliance review
+      - Brand review
+      - Stakeholder approval
+    gate:
+      approver: jarvis
+      criteria: All approvals obtained
+
+  - id: launch
+    name: Launch
+    order: 4
+    agents: [jarvis]
+    depends_on: [review]
+    deliverables:
+      - Campaign live
+      - Tracking configured
+      - Team notified
+    gate:
+      criteria: Campaign launched successfully
+
+  - id: measure
+    name: Measure & Optimize
+    order: 5
+    agents: [architect]
+    depends_on: [launch]
+    deliverables:
+      - Performance report
+      - Optimization recommendations
+      - Learnings documented
+    gate:
+      criteria: Report delivered, next steps defined
+
+task_templates:
+  - phase: strategy
+    subject: "[CAMPAIGN] Strategy: {campaign_name}"
+    priority: 8
+
+  - phase: creative
+    subject: "[CAMPAIGN] Creative: {campaign_name} - {asset_type}"
+    priority: 7
+
+  - phase: launch
+    subject: "[CAMPAIGN] Launch: {campaign_name}"
+    priority: 9
+
+  - phase: measure
+    subject: "[CAMPAIGN] Report: {campaign_name}"
+    priority: 6
