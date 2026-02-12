@@ -36,6 +36,17 @@ export interface MissionExecuteRequest {
   project_communications?: string;  // COMMS.md
   project_document_index?: string;  // INDEX.md
   api_credentials?: ApiCredentials;  // Per-request API credentials from Mission Control
+  max_iterations?: number;   // Multi-turn: max LLM turns per execution (default: 1 = single-shot)
+}
+
+/**
+ * Output from a single turn in multi-turn execution
+ */
+export interface TurnOutput {
+  turn: number;
+  output: string;
+  duration_ms: number;
+  completed: boolean;
 }
 
 /**
@@ -47,6 +58,8 @@ export interface MissionExecuteResponse {
   artifact_path?: string;
   error?: string;
   duration_ms?: number;
+  turns_used?: number;          // Multi-turn: how many turns were executed
+  turn_outputs?: TurnOutput[];  // Multi-turn: per-turn output details
 }
 
 /**
@@ -102,10 +115,70 @@ function buildCredentialEnvVars(credentials: ApiCredentials): Record<string, str
 }
 
 /**
- * Execute a task via the MoltBot gateway
+ * Multi-turn timeout constants
+ */
+const SINGLE_SHOT_TIMEOUT_MS = 300_000;    // 5 min legacy timeout for single-shot
+const MULTI_TURN_TOTAL_BUDGET_MS = 270_000; // 4.5 min total budget for multi-turn
+const MULTI_TURN_PER_TURN_CAP_MS = 180_000; // 3 min max per turn
+const MULTI_TURN_MIN_REMAINING_MS = 60_000;  // 1 min minimum to start a new turn
+
+/**
+ * Error indicators for heuristic completion detection
+ */
+const ERROR_INDICATORS = [
+  'error:',
+  'failed',
+  'todo:',
+  'fixme',
+  'not implemented',
+  'incomplete',
+  'missing',
+  'broken',
+];
+
+/**
+ * Check if a turn's output indicates task completion
  *
- * This injects the agent's soul content as system context and
- * sends the task as a user prompt to the gateway.
+ * Priority order:
+ * 1. [TASK_COMPLETE] marker → completed
+ * 2. Exit code != 0 → not completed (failure)
+ * 3. [NEEDS_REFINEMENT] marker → not completed
+ * 4. No error indicators + output > 100 chars → completed (heuristic)
+ * 5. Default → not completed
+ */
+function checkCompletion(output: string, exitCode: number): boolean {
+  // 1. Explicit completion marker
+  if (output.includes('[TASK_COMPLETE]')) {
+    return true;
+  }
+
+  // 2. Process failure
+  if (exitCode !== 0) {
+    return false;
+  }
+
+  // 3. Explicit refinement request
+  if (output.includes('[NEEDS_REFINEMENT]')) {
+    return false;
+  }
+
+  // 4. Heuristic: clean output with sufficient length
+  if (output.length > 100) {
+    const lowerOutput = output.toLowerCase();
+    const hasErrors = ERROR_INDICATORS.some(indicator => lowerOutput.includes(indicator));
+    if (!hasErrors) {
+      return true;
+    }
+  }
+
+  // 5. Default: not completed
+  return false;
+}
+
+/**
+ * Execute a task via the MoltBot gateway
+ * Supports multi-turn execution: each turn is a fresh `openclaw chat --once` invocation
+ * whose prompt includes the previous turn's output for self-correction.
  */
 export async function executeMissionTask(
   sandbox: Sandbox,
@@ -113,27 +186,12 @@ export async function executeMissionTask(
   request: MissionExecuteRequest
 ): Promise<MissionExecuteResponse> {
   const startTime = Date.now();
+  const maxIterations = request.max_iterations || 1;
+  const isMultiTurn = maxIterations > 1;
 
   try {
     // Ensure gateway is running
     await ensureMoltbotGateway(sandbox, env);
-
-    // Build the prompt with task context
-    const prompt = buildTaskPrompt(request);
-
-    // Execute via openclaw CLI (non-interactive mode)
-    // The CLI will use the configured API keys from the environment
-    const escapedPrompt = prompt.replace(/'/g, "'\\''");
-
-    // Build command with optional model override
-    let command = `openclaw chat --once --url ws://localhost:18789`;
-    if (request.model_override) {
-      // Model format: provider/model-id (e.g., xai/grok-4-1)
-      command += ` --model '${request.model_override}'`;
-    }
-    command += ` '${escapedPrompt}'`;
-
-    console.log(`[mission] Executing task ${request.task_id} for agent ${request.agent_id}`);
 
     // Build environment with per-request credentials if provided
     let execEnv: Record<string, string> | undefined;
@@ -142,35 +200,115 @@ export async function executeMissionTask(
       console.log(`[mission] Using per-request credentials for provider: ${request.api_credentials.provider}`);
     }
 
-    // Start process with optional environment override
-    const proc = execEnv
-      ? await sandbox.startProcess(command, { env: execEnv })
-      : await sandbox.startProcess(command);
+    console.log(`[mission] Executing task ${request.task_id} for agent ${request.agent_id} (max_iterations: ${maxIterations})`);
 
-    // Wait for completion with 5 minute timeout (tasks can be complex)
-    await waitForProcess(proc, 300000);
+    const turnOutputs: TurnOutput[] = [];
+    let finalOutput = '';
+    let finalSuccess = false;
 
-    const logs = await proc.getLogs();
-    const stdout = logs.stdout || '';
-    const stderr = logs.stderr || '';
+    for (let turn = 1; turn <= maxIterations; turn++) {
+      const turnStart = Date.now();
+      const elapsed = turnStart - startTime;
 
-    const duration_ms = Date.now() - startTime;
+      // Calculate per-turn timeout
+      let turnTimeout: number;
+      if (!isMultiTurn) {
+        // Single-shot: use legacy 300s timeout (backwards compat)
+        turnTimeout = SINGLE_SHOT_TIMEOUT_MS;
+      } else {
+        const remaining = MULTI_TURN_TOTAL_BUDGET_MS - elapsed;
+        if (remaining < MULTI_TURN_MIN_REMAINING_MS) {
+          console.log(`[mission] Turn ${turn}: insufficient time remaining (${remaining}ms), stopping`);
+          break;
+        }
+        turnTimeout = Math.min(remaining, MULTI_TURN_PER_TURN_CAP_MS);
+      }
 
-    if (proc.exitCode !== 0) {
-      console.error(`[mission] Task ${request.task_id} failed:`, stderr);
-      return {
-        success: false,
-        error: `Process exited with code ${proc.exitCode}: ${stderr}`,
-        duration_ms,
-      };
+      // Build prompt
+      const prompt = turn === 1
+        ? buildFirstTurnPrompt(request, isMultiTurn)
+        : buildFollowUpTurnPrompt(request, turn, finalOutput, turn === maxIterations);
+
+      const escapedPrompt = prompt.replace(/'/g, "'\\''");
+
+      // Build command with optional model override
+      let command = `openclaw chat --once --url ws://localhost:18789`;
+      if (request.model_override) {
+        command += ` --model '${request.model_override}'`;
+      }
+      command += ` '${escapedPrompt}'`;
+
+      if (isMultiTurn) {
+        console.log(`[mission] Turn ${turn}/${maxIterations} (timeout: ${Math.round(turnTimeout / 1000)}s)`);
+      }
+
+      // Execute turn
+      const proc = execEnv
+        ? await sandbox.startProcess(command, { env: execEnv })
+        : await sandbox.startProcess(command);
+
+      await waitForProcess(proc, turnTimeout);
+
+      const logs = await proc.getLogs();
+      const stdout = logs.stdout || '';
+      const stderr = logs.stderr || '';
+      const exitCode = proc.exitCode ?? 1;
+      const turnDuration = Date.now() - turnStart;
+
+      // Check completion
+      const completed = checkCompletion(stdout, exitCode);
+
+      turnOutputs.push({
+        turn,
+        output: stdout,
+        duration_ms: turnDuration,
+        completed,
+      });
+
+      finalOutput = stdout;
+
+      if (exitCode !== 0 && turn === maxIterations) {
+        // Final turn failed — report failure
+        console.error(`[mission] Task ${request.task_id} failed on final turn ${turn}:`, stderr);
+        finalSuccess = false;
+        break;
+      }
+
+      if (completed) {
+        console.log(`[mission] Task ${request.task_id} completed on turn ${turn} in ${turnDuration}ms`);
+        finalSuccess = true;
+        break;
+      }
+
+      if (turn === maxIterations) {
+        // Exhausted all turns — use last output as best effort
+        console.log(`[mission] Task ${request.task_id} exhausted ${maxIterations} turns, using last output`);
+        finalSuccess = exitCode === 0;
+        break;
+      }
+
+      // Not completed, will continue to next turn
+      console.log(`[mission] Turn ${turn} not completed (exit=${exitCode}), continuing to turn ${turn + 1}`);
     }
 
-    console.log(`[mission] Task ${request.task_id} completed in ${duration_ms}ms`);
+    const duration_ms = Date.now() - startTime;
+    const turnsUsed = turnOutputs.length;
+
+    if (isMultiTurn) {
+      console.log(`[mission] Task ${request.task_id} finished: ${turnsUsed} turns, ${duration_ms}ms total, success=${finalSuccess}`);
+    }
 
     return {
-      success: true,
-      output: stdout,
+      success: finalSuccess,
+      output: finalOutput,
       duration_ms,
+      turns_used: turnsUsed,
+      turn_outputs: isMultiTurn ? turnOutputs : undefined,
+      ...(finalSuccess ? {} : {
+        error: turnOutputs[turnOutputs.length - 1]?.output
+          ? `Task not completed after ${turnsUsed} turn(s)`
+          : 'No output produced',
+      }),
     };
   } catch (error) {
     const duration_ms = Date.now() - startTime;
@@ -186,9 +324,11 @@ export async function executeMissionTask(
 }
 
 /**
- * Build the task prompt with agent context
+ * Build the first turn prompt with full agent context
+ * For single-shot (max_iterations == 1): identical to legacy prompt (no markers)
+ * For multi-turn: includes completion markers in instructions
  */
-function buildTaskPrompt(request: MissionExecuteRequest): string {
+function buildFirstTurnPrompt(request: MissionExecuteRequest, isMultiTurn: boolean): string {
   const sections: string[] = [];
 
   // Agent soul/personality
@@ -234,8 +374,23 @@ function buildTaskPrompt(request: MissionExecuteRequest): string {
 
 ${request.task_description || 'No additional description provided.'}`);
 
-  // Instructions
-  sections.push(`# Instructions
+  // Instructions — multi-turn includes completion markers
+  if (isMultiTurn) {
+    sections.push(`# Instructions
+
+You are executing this task as part of the Lifebot project.
+
+1. Read the task description carefully
+2. Implement the required functionality
+3. Ensure the code works and handles basic errors
+4. Report what you've created or accomplished
+
+**When you are done**, end your response with \`[TASK_COMPLETE]\`.
+**If you need another pass** to refine or fix issues, end with \`[NEEDS_REFINEMENT]\`.
+
+Begin the task now.`);
+  } else {
+    sections.push(`# Instructions
 
 You are executing this task as part of the Lifebot project.
 
@@ -245,6 +400,58 @@ You are executing this task as part of the Lifebot project.
 4. Report what you've created or accomplished
 
 Begin the task now.`);
+  }
+
+  return sections.join('\n\n---\n\n');
+}
+
+/**
+ * Build a follow-up turn prompt with abbreviated context
+ * Includes previous output for self-correction
+ */
+function buildFollowUpTurnPrompt(
+  request: MissionExecuteRequest,
+  turn: number,
+  previousOutput: string,
+  isFinalTurn: boolean
+): string {
+  const sections: string[] = [];
+
+  // Brief agent identity reminder
+  sections.push(`# Agent: ${request.agent_id} (Turn ${turn})`);
+
+  // Previous turn's output (truncate if too long)
+  const maxPreviousLength = 8000;
+  const truncatedOutput = previousOutput.length > maxPreviousLength
+    ? `...(truncated)...\n${previousOutput.slice(-maxPreviousLength)}`
+    : previousOutput;
+
+  sections.push(`# Previous Turn Output
+
+${truncatedOutput}`);
+
+  // Task reminder (just ID + subject)
+  sections.push(`# Task Reminder
+
+**Task ID:** ${request.task_id}
+**Subject:** ${request.task_subject}`);
+
+  // Instructions
+  const finalTurnNote = isFinalTurn
+    ? '\n\n**This is your final turn.** Provide your best output now.'
+    : '';
+
+  sections.push(`# Instructions
+
+Review your previous output above. Look for:
+- Errors, incomplete sections, or missing details
+- Improvements to make the output more complete and correct
+- Any issues flagged in the previous output
+
+Refine your work and provide the improved, complete output.
+
+**When you are done**, end your response with \`[TASK_COMPLETE]\`.
+**If you still need another pass**, end with \`[NEEDS_REFINEMENT]\`.${finalTurnNote}`);
 
   return sections.join('\n\n---\n\n');
 }
@@ -324,6 +531,9 @@ export function validateMissionRequest(
       project_communications: typeof req.project_communications === 'string' ? req.project_communications : undefined,
       project_document_index: typeof req.project_document_index === 'string' ? req.project_document_index : undefined,
       api_credentials: validateApiCredentials(req.api_credentials),
+      max_iterations: typeof req.max_iterations === 'number'
+        ? Math.max(1, Math.min(Math.floor(req.max_iterations), 5))
+        : undefined,
     },
   };
 }
