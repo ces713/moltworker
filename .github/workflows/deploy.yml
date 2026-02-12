@@ -25,6 +25,14 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Docker is pre-installed on ubuntu-latest but we set up buildx
+      # for better layer caching on container image builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify Docker is available
+        run: docker info
+
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v3
         with:
