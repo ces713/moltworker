@@ -324,6 +324,34 @@ export async function executeMissionTask(
 }
 
 /**
+ * Detect if a task should receive action block format instructions.
+ * Triggers on: [KICKOFF] prefix, planning keywords, or Jarvis with planning context.
+ */
+function detectActionBlockTask(request: MissionExecuteRequest): boolean {
+  const subject = request.task_subject || '';
+  const description = request.task_description || '';
+  const text = `${subject} ${description}`.toLowerCase();
+
+  // [KICKOFF] prefix — always a task generation task
+  if (subject.startsWith('[KICKOFF]')) {
+    return true;
+  }
+
+  // Planning keywords in subject/description
+  const planningKeywords = ['create tasks', 'generate tasks', 'plan tasks', 'break down', 'task plan'];
+  if (planningKeywords.some(kw => text.includes(kw))) {
+    return true;
+  }
+
+  // Jarvis with action block references already in description
+  if (request.agent_id === 'jarvis' && text.includes('action block')) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Build the first turn prompt with full agent context
  * For single-shot (max_iterations == 1): identical to legacy prompt (no markers)
  * For multi-turn: includes completion markers in instructions
@@ -373,6 +401,31 @@ function buildFirstTurnPrompt(request: MissionExecuteRequest, isMultiTurn: boole
 ## Description
 
 ${request.task_description || 'No additional description provided.'}`);
+
+  // Detect if this task needs action block instructions
+  const needsActionBlocks = detectActionBlockTask(request);
+  if (needsActionBlocks) {
+    sections.push(`# Action Block Format
+
+You can create tasks and dependencies by emitting structured JSONL between markers.
+Mission Control will parse and execute these on your behalf.
+
+\`\`\`
+[ACTIONS_BEGIN]
+{"action":"create_task","ref":"T1","subject":"Task title","description":"Detailed description","priority":8,"assign_to":"architect"}
+{"action":"create_task","ref":"T2","subject":"Another task","description":"...","priority":7,"assign_to":"backend"}
+{"action":"add_dependency","task_ref":"T2","blocked_by_ref":"T1"}
+[ACTIONS_END]
+\`\`\`
+
+**Rules:**
+- One JSON object per line (JSONL format)
+- \`ref\` is a label you assign (T1, T2, etc.) — used to wire up dependencies
+- \`assign_to\` must be one of: jarvis, architect, backend, frontend, reviewer, hawk
+- \`priority\` range: 1 (lowest) to 10 (highest)
+- Maximum 20 actions per block
+- Always include the action block BEFORE your \`[TASK_COMPLETE]\` marker`);
+  }
 
   // Instructions — multi-turn includes completion markers
   if (isMultiTurn) {

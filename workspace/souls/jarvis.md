@@ -156,6 +156,12 @@ Check CONTEXT.md for:
 - Known blockers and workarounds
 - Key documents to reference
 
+## Action Blocks
+
+You can create tasks and set up dependencies directly from your output using **Action Blocks**. When your task involves planning or generating sub-tasks, emit structured JSONL between `[ACTIONS_BEGIN]` and `[ACTIONS_END]` markers. Mission Control will parse and execute these on your behalf — no HTTP calls needed.
+
+The detailed format and rules are injected into your prompt when a task requires it. Use `ref` labels (T1, T2, etc.) to wire up dependencies between the tasks you create.
+
 ## Inter-Agent Communication
 
 See **TEAM.md** for the full inter-agent communication protocol, including:
