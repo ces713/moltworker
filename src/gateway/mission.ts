@@ -14,7 +14,7 @@ import { ensureMoltbotGateway, waitForProcess } from './index';
  * Allows Mission Control to pass API keys for each execution
  */
 export interface ApiCredentials {
-  provider: 'anthropic' | 'openai' | 'xai' | 'moonshot' | 'cloudflare-ai-gateway';
+  provider: 'anthropic' | 'openai' | 'xai' | 'moonshot' | 'cloudflare-ai-gateway' | 'openrouter' | 'minimax';
   api_key: string;
   base_url?: string;  // For custom endpoints or AI Gateway
 }
@@ -95,6 +95,18 @@ function buildCredentialEnvVars(credentials: ApiCredentials): Record<string, str
       if (credentials.base_url) {
         envVars.MOONSHOT_BASE_URL = credentials.base_url;
       }
+      break;
+
+    case 'openrouter':
+      // OpenRouter uses OpenAI-compatible API
+      envVars.OPENAI_API_KEY = credentials.api_key;
+      envVars.OPENAI_BASE_URL = credentials.base_url || 'https://openrouter.ai/api/v1';
+      break;
+
+    case 'minimax':
+      // MiniMax uses OpenAI-compatible API
+      envVars.OPENAI_API_KEY = credentials.api_key;
+      envVars.OPENAI_BASE_URL = credentials.base_url || 'https://api.minimaxi.chat/v1';
       break;
 
     case 'cloudflare-ai-gateway':
@@ -519,7 +531,7 @@ function validateApiCredentials(creds: unknown): ApiCredentials | undefined {
 
   const c = creds as Record<string, unknown>;
 
-  const validProviders = ['anthropic', 'openai', 'xai', 'moonshot', 'cloudflare-ai-gateway'];
+  const validProviders = ['anthropic', 'openai', 'xai', 'moonshot', 'cloudflare-ai-gateway', 'openrouter', 'minimax'];
   if (typeof c.provider !== 'string' || !validProviders.includes(c.provider)) {
     return undefined;
   }
