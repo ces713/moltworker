@@ -39,6 +39,9 @@ RUN chmod +x /usr/local/bin/start-openclaw.sh
 # Copy custom skills
 COPY skills/ /root/clawd/skills/
 
+# Copy workspace files (methodologies, templates, etc.)
+COPY workspace/methodologies/ /root/clawd/methodologies/
+
 # Set working directory
 WORKDIR /root/clawd
 
