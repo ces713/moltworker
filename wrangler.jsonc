@@ -77,6 +77,7 @@
   // - ANTHROPIC_API_KEY: Direct Anthropic API key
   // - OPENAI_API_KEY: Direct OpenAI API key
   // - MOONSHOT_API_KEY: Moonshot/Kimi API key for cost-efficient heartbeats
+  // - CF_AI_GATEWAY_MODELS: Comma-separated model IDs for multi-agent routing (e.g., "grok-4,grok-3,grok-3-mini")
   // - Cloudflare AI Gateway (alternative to direct keys):
   //   - CLOUDFLARE_AI_GATEWAY_API_KEY: API key for requests through the gateway
   //   - CF_AI_GATEWAY_ACCOUNT_ID: Your Cloudflare account ID

@@ -287,9 +287,24 @@ export async function executeMissionTask(
       await waitForProcess(proc, turnTimeout);
 
       const logs = await proc.getLogs();
-      const stdout = logs.stdout || '';
-      const stderr = logs.stderr || '';
-      const exitCode = proc.exitCode ?? 1;
+      let stdout = logs.stdout || '';
+      let stderr = logs.stderr || '';
+      let exitCode = proc.exitCode ?? 1;
+
+      // If agent not found, retry with default "main" agent
+      if (exitCode !== 0 && stderr.includes('Unknown agent')) {
+        console.warn(`[mission] Agent '${agentId}' not found, retrying with default agent`);
+        const fallbackCommand = `openclaw agent --agent 'main' --session-id '${sessionId}' --message '${escapedPrompt}'`;
+        const fallbackProc = execEnv
+          ? await sandbox.startProcess(fallbackCommand, { env: execEnv })
+          : await sandbox.startProcess(fallbackCommand);
+        await waitForProcess(fallbackProc, turnTimeout - (Date.now() - turnStart));
+        const fallbackLogs = await fallbackProc.getLogs();
+        stdout = fallbackLogs.stdout || '';
+        stderr = fallbackLogs.stderr || '';
+        exitCode = fallbackProc.exitCode ?? 1;
+      }
+
       const turnDuration = Date.now() - turnStart;
 
       // Track stderr for error reporting
