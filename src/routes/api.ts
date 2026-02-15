@@ -341,7 +341,9 @@ missionApi.post('/execute', async (c) => {
       return c.json({ success: false, error: validation.error }, 400);
     }
 
-    console.log(`[mission] Received task ${validation.request.task_id} for agent ${validation.request.agent_id}`);
+    console.log(
+      `[mission] Received task ${validation.request.task_id} for agent ${validation.request.agent_id}`,
+    );
 
     const result = await executeMissionTask(sandbox, c.env, validation.request);
 
@@ -393,10 +395,12 @@ missionApi.get('/agents', async (c) => {
 
     try {
       const config = JSON.parse(stdout);
-      const agents = (config.agents?.list || []).map((a: { id: string; model: string | { primary: string } }) => ({
-        id: a.id,
-        model: typeof a.model === 'object' ? a.model.primary : a.model,
-      }));
+      const agents = (config.agents?.list || []).map(
+        (a: { id: string; model: string | { primary: string } }) => ({
+          id: a.id,
+          model: typeof a.model === 'object' ? a.model.primary : a.model,
+        }),
+      );
       return c.json({ agents });
     } catch {
       return c.json({ agents: [], error: 'Failed to parse agent config' });
@@ -450,7 +454,12 @@ adminApi.post('/sync-models', async (c) => {
       provider.models = provider.models || [];
       const existingIds = new Set(provider.models.map((m: { id: string }) => m.id));
       if (!existingIds.has(model.id)) {
-        provider.models.push({ id: model.id, name: model.id, contextWindow: 131072, maxTokens: 8192 });
+        provider.models.push({
+          id: model.id,
+          name: model.id,
+          contextWindow: 131072,
+          maxTokens: 8192,
+        });
       }
 
       // Add agent if not exists
@@ -482,10 +491,12 @@ adminApi.post('/sync-models', async (c) => {
     }
 
     // 5. Return new agent list
-    const agents = (config.agents?.list || []).map((a: { id: string; model: string | { primary: string } }) => ({
-      id: a.id,
-      model: typeof a.model === 'object' ? a.model.primary : a.model,
-    }));
+    const agents = (config.agents?.list || []).map(
+      (a: { id: string; model: string | { primary: string } }) => ({
+        id: a.id,
+        model: typeof a.model === 'object' ? a.model.primary : a.model,
+      }),
+    );
 
     return c.json({ success: true, agents });
   } catch (error) {

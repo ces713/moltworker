@@ -14,9 +14,16 @@ import { ensureMoltbotGateway, waitForProcess } from './index';
  * Allows Mission Control to pass API keys for each execution
  */
 export interface ApiCredentials {
-  provider: 'anthropic' | 'openai' | 'xai' | 'moonshot' | 'cloudflare-ai-gateway' | 'openrouter' | 'minimax';
+  provider:
+    | 'anthropic'
+    | 'openai'
+    | 'xai'
+    | 'moonshot'
+    | 'cloudflare-ai-gateway'
+    | 'openrouter'
+    | 'minimax';
   api_key: string;
-  base_url?: string;  // For custom endpoints or AI Gateway
+  base_url?: string; // For custom endpoints or AI Gateway
 }
 
 /**
@@ -28,15 +35,15 @@ export interface MissionExecuteRequest {
   task_subject: string;
   task_description: string;
   soul_content: string;
-  model_override?: string;  // e.g., "xai/grok-4-1" or "anthropic/claude-sonnet-4-5"
-  team_context?: string;     // TEAM.md content
-  methodology_context?: string;  // Methodology YAML
-  agent_memory?: string;     // Agent's persistent memory
-  project_memory?: string;   // Project-specific learnings
-  project_communications?: string;  // COMMS.md
-  project_document_index?: string;  // INDEX.md
-  api_credentials?: ApiCredentials;  // Per-request API credentials from Mission Control
-  max_iterations?: number;   // Multi-turn: max LLM turns per execution (default: 1 = single-shot)
+  model_override?: string; // e.g., "xai/grok-4-1" or "anthropic/claude-sonnet-4-5"
+  team_context?: string; // TEAM.md content
+  methodology_context?: string; // Methodology YAML
+  agent_memory?: string; // Agent's persistent memory
+  project_memory?: string; // Project-specific learnings
+  project_communications?: string; // COMMS.md
+  project_document_index?: string; // INDEX.md
+  api_credentials?: ApiCredentials; // Per-request API credentials from Mission Control
+  max_iterations?: number; // Multi-turn: max LLM turns per execution (default: 1 = single-shot)
 }
 
 /**
@@ -58,8 +65,8 @@ export interface MissionExecuteResponse {
   artifact_path?: string;
   error?: string;
   duration_ms?: number;
-  turns_used?: number;          // Multi-turn: how many turns were executed
-  turn_outputs?: TurnOutput[];  // Multi-turn: per-turn output details
+  turns_used?: number; // Multi-turn: how many turns were executed
+  turn_outputs?: TurnOutput[]; // Multi-turn: per-turn output details
 }
 
 /**
@@ -139,10 +146,10 @@ function getOpenClawAgentId(modelOverride?: string): string {
 /**
  * Multi-turn timeout constants
  */
-const SINGLE_SHOT_TIMEOUT_MS = 300_000;    // 5 min legacy timeout for single-shot
+const SINGLE_SHOT_TIMEOUT_MS = 300_000; // 5 min legacy timeout for single-shot
 const MULTI_TURN_TOTAL_BUDGET_MS = 270_000; // 4.5 min total budget for multi-turn
 const MULTI_TURN_PER_TURN_CAP_MS = 180_000; // 3 min max per turn
-const MULTI_TURN_MIN_REMAINING_MS = 60_000;  // 1 min minimum to start a new turn
+const MULTI_TURN_MIN_REMAINING_MS = 60_000; // 1 min minimum to start a new turn
 
 /**
  * Error indicators for heuristic completion detection
@@ -187,7 +194,7 @@ function checkCompletion(output: string, exitCode: number): boolean {
   // 4. Heuristic: clean output with sufficient length
   if (output.length > 100) {
     const lowerOutput = output.toLowerCase();
-    const hasErrors = ERROR_INDICATORS.some(indicator => lowerOutput.includes(indicator));
+    const hasErrors = ERROR_INDICATORS.some((indicator) => lowerOutput.includes(indicator));
     if (!hasErrors) {
       return true;
     }
@@ -205,7 +212,7 @@ function checkCompletion(output: string, exitCode: number): boolean {
 export async function executeMissionTask(
   sandbox: Sandbox,
   env: MoltbotEnv,
-  request: MissionExecuteRequest
+  request: MissionExecuteRequest,
 ): Promise<MissionExecuteResponse> {
   const startTime = Date.now();
   const maxIterations = request.max_iterations || 1;
@@ -219,10 +226,14 @@ export async function executeMissionTask(
     let execEnv: Record<string, string> | undefined;
     if (request.api_credentials) {
       execEnv = buildCredentialEnvVars(request.api_credentials);
-      console.log(`[mission] Using per-request credentials for provider: ${request.api_credentials.provider}`);
+      console.log(
+        `[mission] Using per-request credentials for provider: ${request.api_credentials.provider}`,
+      );
     }
 
-    console.log(`[mission] Executing task ${request.task_id} for agent ${request.agent_id} (max_iterations: ${maxIterations})`);
+    console.log(
+      `[mission] Executing task ${request.task_id} for agent ${request.agent_id} (max_iterations: ${maxIterations})`,
+    );
 
     const turnOutputs: TurnOutput[] = [];
     let finalOutput = '';
@@ -241,16 +252,19 @@ export async function executeMissionTask(
       } else {
         const remaining = MULTI_TURN_TOTAL_BUDGET_MS - elapsed;
         if (remaining < MULTI_TURN_MIN_REMAINING_MS) {
-          console.log(`[mission] Turn ${turn}: insufficient time remaining (${remaining}ms), stopping`);
+          console.log(
+            `[mission] Turn ${turn}: insufficient time remaining (${remaining}ms), stopping`,
+          );
           break;
         }
         turnTimeout = Math.min(remaining, MULTI_TURN_PER_TURN_CAP_MS);
       }
 
       // Build prompt
-      const prompt = turn === 1
-        ? buildFirstTurnPrompt(request, isMultiTurn)
-        : buildFollowUpTurnPrompt(request, turn, finalOutput, turn === maxIterations);
+      const prompt =
+        turn === 1
+          ? buildFirstTurnPrompt(request, isMultiTurn)
+          : buildFollowUpTurnPrompt(request, turn, finalOutput, turn === maxIterations);
 
       const escapedPrompt = prompt.replace(/'/g, "'\\''");
 
@@ -260,7 +274,9 @@ export async function executeMissionTask(
       const command = `openclaw agent --agent '${agentId}' --session-id '${sessionId}' --message '${escapedPrompt}'`;
 
       if (isMultiTurn) {
-        console.log(`[mission] Turn ${turn}/${maxIterations} (timeout: ${Math.round(turnTimeout / 1000)}s)`);
+        console.log(
+          `[mission] Turn ${turn}/${maxIterations} (timeout: ${Math.round(turnTimeout / 1000)}s)`,
+        );
       }
 
       // Execute turn
@@ -301,27 +317,35 @@ export async function executeMissionTask(
       }
 
       if (completed) {
-        console.log(`[mission] Task ${request.task_id} completed on turn ${turn} in ${turnDuration}ms`);
+        console.log(
+          `[mission] Task ${request.task_id} completed on turn ${turn} in ${turnDuration}ms`,
+        );
         finalSuccess = true;
         break;
       }
 
       if (turn === maxIterations) {
         // Exhausted all turns — use last output as best effort
-        console.log(`[mission] Task ${request.task_id} exhausted ${maxIterations} turns, using last output`);
+        console.log(
+          `[mission] Task ${request.task_id} exhausted ${maxIterations} turns, using last output`,
+        );
         finalSuccess = exitCode === 0;
         break;
       }
 
       // Not completed, will continue to next turn
-      console.log(`[mission] Turn ${turn} not completed (exit=${exitCode}), continuing to turn ${turn + 1}`);
+      console.log(
+        `[mission] Turn ${turn} not completed (exit=${exitCode}), continuing to turn ${turn + 1}`,
+      );
     }
 
     const duration_ms = Date.now() - startTime;
     const turnsUsed = turnOutputs.length;
 
     if (isMultiTurn) {
-      console.log(`[mission] Task ${request.task_id} finished: ${turnsUsed} turns, ${duration_ms}ms total, success=${finalSuccess}`);
+      console.log(
+        `[mission] Task ${request.task_id} finished: ${turnsUsed} turns, ${duration_ms}ms total, success=${finalSuccess}`,
+      );
     }
 
     return {
@@ -330,13 +354,15 @@ export async function executeMissionTask(
       duration_ms,
       turns_used: turnsUsed,
       turn_outputs: isMultiTurn ? turnOutputs : undefined,
-      ...(finalSuccess ? {} : {
-        error: lastStderr
-          ? lastStderr.slice(0, 500)
-          : (turnOutputs[turnOutputs.length - 1]?.output
-            ? `Task not completed after ${turnsUsed} turn(s)`
-            : 'No output produced'),
-      }),
+      ...(finalSuccess
+        ? {}
+        : {
+            error: lastStderr
+              ? lastStderr.slice(0, 500)
+              : turnOutputs[turnOutputs.length - 1]?.output
+                ? `Task not completed after ${turnsUsed} turn(s)`
+                : 'No output produced',
+          }),
     };
   } catch (error) {
     const duration_ms = Date.now() - startTime;
@@ -366,8 +392,14 @@ function detectActionBlockTask(request: MissionExecuteRequest): boolean {
   }
 
   // Planning keywords in subject/description
-  const planningKeywords = ['create tasks', 'generate tasks', 'plan tasks', 'break down', 'task plan'];
-  if (planningKeywords.some(kw => text.includes(kw))) {
+  const planningKeywords = [
+    'create tasks',
+    'generate tasks',
+    'plan tasks',
+    'break down',
+    'task plan',
+  ];
+  if (planningKeywords.some((kw) => text.includes(kw))) {
     return true;
   }
 
@@ -494,7 +526,7 @@ function buildFollowUpTurnPrompt(
   request: MissionExecuteRequest,
   turn: number,
   previousOutput: string,
-  isFinalTurn: boolean
+  isFinalTurn: boolean,
 ): string {
   const sections: string[] = [];
 
@@ -503,9 +535,10 @@ function buildFollowUpTurnPrompt(
 
   // Previous turn's output (truncate if too long)
   const maxPreviousLength = 8000;
-  const truncatedOutput = previousOutput.length > maxPreviousLength
-    ? `...(truncated)...\n${previousOutput.slice(-maxPreviousLength)}`
-    : previousOutput;
+  const truncatedOutput =
+    previousOutput.length > maxPreviousLength
+      ? `...(truncated)...\n${previousOutput.slice(-maxPreviousLength)}`
+      : previousOutput;
 
   sections.push(`# Previous Turn Output
 
@@ -547,7 +580,15 @@ function validateApiCredentials(creds: unknown): ApiCredentials | undefined {
 
   const c = creds as Record<string, unknown>;
 
-  const validProviders = ['anthropic', 'openai', 'xai', 'moonshot', 'cloudflare-ai-gateway', 'openrouter', 'minimax'];
+  const validProviders = [
+    'anthropic',
+    'openai',
+    'xai',
+    'moonshot',
+    'cloudflare-ai-gateway',
+    'openrouter',
+    'minimax',
+  ];
   if (typeof c.provider !== 'string' || !validProviders.includes(c.provider)) {
     return undefined;
   }
@@ -567,7 +608,7 @@ function validateApiCredentials(creds: unknown): ApiCredentials | undefined {
  * Validate a mission execution request
  */
 export function validateMissionRequest(
-  body: unknown
+  body: unknown,
 ): { valid: true; request: MissionExecuteRequest } | { valid: false; error: string } {
   if (!body || typeof body !== 'object') {
     return { valid: false, error: 'Request body must be a JSON object' };
@@ -606,15 +647,19 @@ export function validateMissionRequest(
       // Optional fields
       model_override: typeof req.model_override === 'string' ? req.model_override : undefined,
       team_context: typeof req.team_context === 'string' ? req.team_context : undefined,
-      methodology_context: typeof req.methodology_context === 'string' ? req.methodology_context : undefined,
+      methodology_context:
+        typeof req.methodology_context === 'string' ? req.methodology_context : undefined,
       agent_memory: typeof req.agent_memory === 'string' ? req.agent_memory : undefined,
       project_memory: typeof req.project_memory === 'string' ? req.project_memory : undefined,
-      project_communications: typeof req.project_communications === 'string' ? req.project_communications : undefined,
-      project_document_index: typeof req.project_document_index === 'string' ? req.project_document_index : undefined,
+      project_communications:
+        typeof req.project_communications === 'string' ? req.project_communications : undefined,
+      project_document_index:
+        typeof req.project_document_index === 'string' ? req.project_document_index : undefined,
       api_credentials: validateApiCredentials(req.api_credentials),
-      max_iterations: typeof req.max_iterations === 'number'
-        ? Math.max(1, Math.min(Math.floor(req.max_iterations), 5))
-        : undefined,
+      max_iterations:
+        typeof req.max_iterations === 'number'
+          ? Math.max(1, Math.min(Math.floor(req.max_iterations), 5))
+          : undefined,
     },
   };
 }

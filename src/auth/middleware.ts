@@ -48,7 +48,9 @@ export function hasMissionControlSecret(c: Context<AppEnv>): boolean {
   const secret = c.env.MISSION_CONTROL_SECRET;
   const headerSecret = c.req.header('X-Mission-Control-Secret');
 
-  console.log(`[auth] Checking Mission Control secret: env_configured=${!!secret}, header_present=${!!headerSecret}`);
+  console.log(
+    `[auth] Checking Mission Control secret: env_configured=${!!secret}, header_present=${!!headerSecret}`,
+  );
 
   if (!secret) {
     console.log('[auth] MISSION_CONTROL_SECRET not configured in environment');
