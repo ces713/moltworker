@@ -335,9 +335,12 @@ if (config.models && config.models.providers) {
         const models = provider.models || [];
         config.agents = config.agents || {};
         config.agents.list = config.agents.list || [];
-        const existingAgentIds = new Set(config.agents.list.map(a => a.id));
         for (const model of models) {
-            if (!existingAgentIds.has(model.id)) {
+            const existingAgent = config.agents.list.find(a => a.id === model.id);
+            if (existingAgent) {
+                existingAgent.model = { primary: providerName + '/' + model.id };
+                console.log('Updated agent: ' + model.id + ' -> ' + providerName + '/' + model.id);
+            } else {
                 config.agents.list.push({
                     id: model.id,
                     model: { primary: providerName + '/' + model.id },
