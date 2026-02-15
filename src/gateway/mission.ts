@@ -127,6 +127,16 @@ function buildCredentialEnvVars(credentials: ApiCredentials): Record<string, str
 }
 
 /**
+ * Extract the openclaw agent ID from a model override string.
+ * e.g., "xai/grok-4" → "grok-4", "grok-4" → "grok-4", undefined → "main"
+ */
+function getOpenClawAgentId(modelOverride?: string): string {
+  if (!modelOverride) return 'main';
+  const slashIdx = modelOverride.indexOf('/');
+  return slashIdx >= 0 ? modelOverride.substring(slashIdx + 1) : modelOverride;
+}
+
+/**
  * Multi-turn timeout constants
  */
 const SINGLE_SHOT_TIMEOUT_MS = 300_000;    // 5 min legacy timeout for single-shot
@@ -244,12 +254,10 @@ export async function executeMissionTask(
 
       const escapedPrompt = prompt.replace(/'/g, "'\\''");
 
-      // Build command with optional model override
-      let command = `openclaw chat --once --url ws://localhost:18789`;
-      if (request.model_override) {
-        command += ` --model '${request.model_override}'`;
-      }
-      command += ` '${escapedPrompt}'`;
+      // Build command: route to per-model openclaw agent
+      const agentId = getOpenClawAgentId(request.model_override);
+      const sessionId = `mission:${request.task_id}:turn-${turn}`;
+      const command = `openclaw agent --agent '${agentId}' --session-id '${sessionId}' --message '${escapedPrompt}'`;
 
       if (isMultiTurn) {
         console.log(`[mission] Turn ${turn}/${maxIterations} (timeout: ${Math.round(turnTimeout / 1000)}s)`);

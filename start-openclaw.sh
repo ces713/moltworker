@@ -280,6 +280,46 @@ if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_APP_TOKEN) {
     };
 }
 
+// Register all model tiers on the provider
+// CF_AI_GATEWAY_MODELS is comma-separated: "grok-4,grok-3,grok-3-mini"
+if (process.env.CF_AI_GATEWAY_MODELS && config.models && config.models.providers) {
+    const providerName = Object.keys(config.models.providers)[0];
+    if (providerName) {
+        const provider = config.models.providers[providerName];
+        provider.models = provider.models || [];
+        const existingIds = new Set(provider.models.map(m => m.id));
+        const additionalModels = process.env.CF_AI_GATEWAY_MODELS.split(',').map(s => s.trim()).filter(Boolean);
+        for (const modelId of additionalModels) {
+            if (!existingIds.has(modelId)) {
+                provider.models.push({ id: modelId, name: modelId, contextWindow: 131072, maxTokens: 8192 });
+                console.log('Registered additional model: ' + providerName + '/' + modelId);
+            }
+        }
+    }
+}
+
+// Create openclaw agents for each registered model (multi-agent routing)
+if (config.models && config.models.providers) {
+    const providerName = Object.keys(config.models.providers)[0];
+    if (providerName) {
+        const provider = config.models.providers[providerName];
+        const models = provider.models || [];
+        config.agents = config.agents || {};
+        config.agents.list = config.agents.list || [];
+        const existingAgentIds = new Set(config.agents.list.map(a => a.id));
+        for (const model of models) {
+            if (!existingAgentIds.has(model.id)) {
+                config.agents.list.push({
+                    id: model.id,
+                    model: { primary: providerName + '/' + model.id },
+                    workspace: '/root/clawd',
+                });
+                console.log('Created agent: ' + model.id + ' -> ' + providerName + '/' + model.id);
+            }
+        }
+    }
+}
+
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 console.log('Configuration patched successfully');
 EOFPATCH

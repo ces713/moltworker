@@ -373,7 +373,126 @@ missionApi.get('/status', async (c) => {
   }
 });
 
+/**
+ * GET /api/mission/agents - List available openclaw agents
+ * Used by Mission Control to check which models have configured agents
+ */
+missionApi.get('/agents', async (c) => {
+  const sandbox = c.get('sandbox');
+
+  try {
+    // Ensure gateway is running
+    await ensureMoltbotGateway(sandbox, c.env);
+
+    // Read the openclaw config to get agent list
+    const proc = await sandbox.startProcess('cat /root/.openclaw/openclaw.json');
+    await waitForProcess(proc, 5000);
+
+    const logs = await proc.getLogs();
+    const stdout = logs.stdout || '{}';
+
+    try {
+      const config = JSON.parse(stdout);
+      const agents = (config.agents?.list || []).map((a: { id: string; model: string | { primary: string } }) => ({
+        id: a.id,
+        model: typeof a.model === 'object' ? a.model.primary : a.model,
+      }));
+      return c.json({ agents });
+    } catch {
+      return c.json({ agents: [], error: 'Failed to parse agent config' });
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[mission] Failed to read agents:', errorMessage);
+    return c.json({ agents: [], error: 'Failed to read agent config' });
+  }
+});
+
 // Mount mission API routes under /mission
 api.route('/mission', missionApi);
+
+// =============================================================================
+// ADMIN SYNC ROUTES
+// =============================================================================
+
+/**
+ * POST /api/admin/sync-models - Sync models from Mission Control
+ * Accepts a model list, patches openclaw config, and restarts gateway
+ */
+adminApi.post('/sync-models', async (c) => {
+  const sandbox = c.get('sandbox');
+
+  try {
+    const { models } = await c.req.json<{
+      models: Array<{ id: string; provider_name: string }>;
+    }>();
+
+    if (!models || !Array.isArray(models)) {
+      return c.json({ error: 'models array is required' }, 400);
+    }
+
+    // Ensure gateway is running so config exists
+    await ensureMoltbotGateway(sandbox, c.env);
+
+    // 1. Read current config
+    const readProc = await sandbox.startProcess('cat /root/.openclaw/openclaw.json');
+    await waitForProcess(readProc, 5000);
+    const readLogs = await readProc.getLogs();
+    const config = JSON.parse(readLogs.stdout || '{}');
+
+    // 2. Add new models to provider + create agents
+    for (const model of models) {
+      const providerName = model.provider_name;
+      const provider = config.models?.providers?.[providerName];
+      if (!provider) continue;
+
+      // Add model to provider if not exists
+      provider.models = provider.models || [];
+      const existingIds = new Set(provider.models.map((m: { id: string }) => m.id));
+      if (!existingIds.has(model.id)) {
+        provider.models.push({ id: model.id, name: model.id, contextWindow: 131072, maxTokens: 8192 });
+      }
+
+      // Add agent if not exists
+      config.agents = config.agents || { list: [] };
+      config.agents.list = config.agents.list || [];
+      const existingAgentIds = new Set(config.agents.list.map((a: { id: string }) => a.id));
+      if (!existingAgentIds.has(model.id)) {
+        config.agents.list.push({
+          id: model.id,
+          model: { primary: providerName + '/' + model.id },
+          workspace: '/root/clawd',
+        });
+      }
+    }
+
+    // 3. Write config back — use a temp file to avoid quoting issues
+    const configJson = JSON.stringify(config, null, 2);
+    // Write via node for safe escaping
+    const writeScript = `node -e "require('fs').writeFileSync('/root/.openclaw/openclaw.json', ${JSON.stringify(configJson)})"`;
+    const writeProc = await sandbox.startProcess(writeScript);
+    await waitForProcess(writeProc, 5000);
+
+    // 4. Restart gateway (kill process, ensureMoltbotGateway will restart on next request)
+    try {
+      const killProc = await sandbox.startProcess('pkill -f "openclaw gateway" || true');
+      await waitForProcess(killProc, 5000);
+    } catch {
+      // Process may not exist, that's fine
+    }
+
+    // 5. Return new agent list
+    const agents = (config.agents?.list || []).map((a: { id: string; model: string | { primary: string } }) => ({
+      id: a.id,
+      model: typeof a.model === 'object' ? a.model.primary : a.model,
+    }));
+
+    return c.json({ success: true, agents });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[admin] sync-models error:', errorMessage);
+    return c.json({ error: errorMessage }, 500);
+  }
+});
 
 export { api };

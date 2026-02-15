@@ -26,6 +26,7 @@ export async function findExistingMoltbotProcess(sandbox: Sandbox): Promise<Proc
         proc.command.includes('openclaw devices') ||
         proc.command.includes('openclaw --version') ||
         proc.command.includes('openclaw onboard') ||
+        proc.command.includes('openclaw agent') ||
         proc.command.includes('clawdbot devices') ||
         proc.command.includes('clawdbot --version');
 
