@@ -36,6 +36,9 @@ jobs:
         run: npm test
 
   e2e:
+    # E2E tests require Cloudflare infrastructure secrets (E2E_CLOUDFLARE_API_TOKEN, etc.)
+    # Skip gracefully when secrets aren't configured
+    if: ${{ secrets.E2E_CLOUDFLARE_API_TOKEN != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
