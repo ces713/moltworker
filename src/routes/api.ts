@@ -308,9 +308,6 @@ adminApi.post('/gateway/restart', async (c) => {
   }
 });
 
-// Mount admin API routes under /admin
-api.route('/admin', adminApi);
-
 // =============================================================================
 // MISSION CONTROL ROUTES
 // =============================================================================
@@ -412,9 +409,6 @@ missionApi.get('/agents', async (c) => {
   }
 });
 
-// Mount mission API routes under /mission
-api.route('/mission', missionApi);
-
 // =============================================================================
 // ADMIN SYNC ROUTES
 // =============================================================================
@@ -505,5 +499,11 @@ adminApi.post('/sync-models', async (c) => {
     return c.json({ error: errorMessage }, 500);
   }
 });
+
+// =============================================================================
+// MOUNT SUBROUTERS (must be after all routes are defined — Hono snapshots at mount time)
+// =============================================================================
+api.route('/admin', adminApi);
+api.route('/mission', missionApi);
 
 export { api };
