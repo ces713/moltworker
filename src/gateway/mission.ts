@@ -217,6 +217,7 @@ export async function executeMissionTask(
     const turnOutputs: TurnOutput[] = [];
     let finalOutput = '';
     let finalSuccess = false;
+    let lastStderr = '';
 
     for (let turn = 1; turn <= maxIterations; turn++) {
       const turnStart = Date.now();
@@ -266,6 +267,11 @@ export async function executeMissionTask(
       const stderr = logs.stderr || '';
       const exitCode = proc.exitCode ?? 1;
       const turnDuration = Date.now() - turnStart;
+
+      // Track stderr for error reporting
+      if (stderr) {
+        lastStderr = stderr;
+      }
 
       // Check completion
       const completed = checkCompletion(stdout, exitCode);
@@ -317,9 +323,11 @@ export async function executeMissionTask(
       turns_used: turnsUsed,
       turn_outputs: isMultiTurn ? turnOutputs : undefined,
       ...(finalSuccess ? {} : {
-        error: turnOutputs[turnOutputs.length - 1]?.output
-          ? `Task not completed after ${turnsUsed} turn(s)`
-          : 'No output produced',
+        error: lastStderr
+          ? lastStderr.slice(0, 500)
+          : (turnOutputs[turnOutputs.length - 1]?.output
+            ? `Task not completed after ${turnsUsed} turn(s)`
+            : 'No output produced'),
       }),
     };
   } catch (error) {
