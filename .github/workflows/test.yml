@@ -35,10 +35,25 @@ jobs:
       - name: Run tests
         run: npm test
 
+  # Check if E2E infrastructure secrets are configured
+  e2e-check:
+    runs-on: ubuntu-latest
+    outputs:
+      has-secrets: ${{ steps.check.outputs.has-secrets }}
+    steps:
+      - name: Check for E2E secrets
+        id: check
+        run: |
+          if [ -n "${{ secrets.E2E_CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "has-secrets=true" >> $GITHUB_OUTPUT
+          else
+            echo "has-secrets=false" >> $GITHUB_OUTPUT
+            echo "::notice::E2E tests skipped — E2E_CLOUDFLARE_API_TOKEN secret not configured"
+          fi
+
   e2e:
-    # E2E tests require Cloudflare infrastructure secrets (E2E_CLOUDFLARE_API_TOKEN, etc.)
-    # Skip gracefully when secrets aren't configured
-    if: ${{ secrets.E2E_CLOUDFLARE_API_TOKEN != '' }}
+    needs: e2e-check
+    if: needs.e2e-check.outputs.has-secrets == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -130,15 +145,15 @@ jobs:
             for webm in /tmp/moltworker-e2e-videos/*.webm; do
               mp4="${webm%.webm}.mp4"
               thumb="${webm%.webm}.png"
-              
+
               # Convert to mp4
               ffmpeg -y -i "$webm" -c:v libx264 -preset fast -crf 22 -c:a aac "$mp4"
-              
+
               # Extract middle frame as thumbnail
               duration=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$mp4")
               midpoint=$(echo "$duration / 2" | bc -l)
               ffmpeg -y -ss "$midpoint" -i "$mp4" -vframes 1 -update 1 -q:v 2 "$thumb"
-              
+
               # Add play button overlay using ImageMagick
               width=$(identify -format '%w' "$thumb")
               height=$(identify -format '%h' "$thumb")
@@ -148,7 +163,7 @@ jobs:
                 -fill 'rgba(0,0,0,0.6)' -draw "circle ${cx},${cy} $((cx+50)),${cy}" \
                 -fill 'white' -draw "polygon $((cx-15)),$((cy-25)) $((cx-15)),$((cy+25)) $((cx+30)),${cy}" \
                 "$thumb"
-              
+
               echo "video_path=$mp4" >> $GITHUB_OUTPUT
               echo "video_name=$(basename $mp4)" >> $GITHUB_OUTPUT
               echo "thumb_path=$thumb" >> $GITHUB_OUTPUT
