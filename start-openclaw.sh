@@ -280,10 +280,37 @@ if (process.env.SLACK_BOT_TOKEN && process.env.SLACK_APP_TOKEN) {
     };
 }
 
+// Direct OpenAI-compatible provider (xAI, etc.) via OPENAI_API_KEY + OPENAI_BASE_URL
+// Creates/updates an 'openai' provider with custom baseUrl for xAI compatibility
+if (process.env.OPENAI_API_KEY && process.env.OPENAI_BASE_URL) {
+    config.models = config.models || {};
+    config.models.providers = config.models.providers || {};
+
+    const existingProvider = Object.keys(config.models.providers).find(
+        n => n === 'openai' || n.includes('openai')
+    );
+
+    if (existingProvider) {
+        config.models.providers[existingProvider].baseUrl = process.env.OPENAI_BASE_URL;
+        config.models.providers[existingProvider].apiKey = process.env.OPENAI_API_KEY;
+        console.log('Updated provider ' + existingProvider + ' baseUrl: ' + process.env.OPENAI_BASE_URL);
+    } else {
+        config.models.providers['openai'] = {
+            baseUrl: process.env.OPENAI_BASE_URL,
+            apiKey: process.env.OPENAI_API_KEY,
+            api: 'openai-completions',
+            models: [],
+        };
+        console.log('Created openai provider with baseUrl: ' + process.env.OPENAI_BASE_URL);
+    }
+}
+
 // Register all model tiers on the provider
 // CF_AI_GATEWAY_MODELS is comma-separated: "grok-4,grok-3,grok-3-mini"
 if (process.env.CF_AI_GATEWAY_MODELS && config.models && config.models.providers) {
-    const providerName = Object.keys(config.models.providers)[0];
+    const providerName = Object.keys(config.models.providers).find(
+        n => n === 'openai' || n.includes('openai')
+    ) || Object.keys(config.models.providers)[0];
     if (providerName) {
         const provider = config.models.providers[providerName];
         provider.models = provider.models || [];
@@ -300,7 +327,9 @@ if (process.env.CF_AI_GATEWAY_MODELS && config.models && config.models.providers
 
 // Create openclaw agents for each registered model (multi-agent routing)
 if (config.models && config.models.providers) {
-    const providerName = Object.keys(config.models.providers)[0];
+    const providerName = Object.keys(config.models.providers).find(
+        n => n === 'openai' || n.includes('openai')
+    ) || Object.keys(config.models.providers)[0];
     if (providerName) {
         const provider = config.models.providers[providerName];
         const models = provider.models || [];

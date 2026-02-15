@@ -20,6 +20,7 @@ export interface MoltbotEnv {
   ANTHROPIC_API_KEY?: string;
   ANTHROPIC_BASE_URL?: string;
   OPENAI_API_KEY?: string;
+  OPENAI_BASE_URL?: string; // Custom base URL for OpenAI-compatible providers (e.g., xAI)
   BRAVE_API_KEY?: string;
   MOONSHOT_API_KEY?: string; // Moonshot/Kimi API key for cost-efficient heartbeats
   MISSION_CONTROL_URL?: string; // Mission Control Worker URL
