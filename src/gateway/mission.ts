@@ -223,9 +223,12 @@ export async function executeMissionTask(
     await ensureMoltbotGateway(sandbox, env);
 
     // Build environment with per-request credentials if provided
-    let execEnv: Record<string, string> | undefined;
+    // Always include NODE_OPTIONS to suppress harmless deprecation warnings (e.g. punycode)
+    const baseEnv: Record<string, string> = { NODE_OPTIONS: '--no-deprecation' };
+    let execEnv: Record<string, string> = request.api_credentials
+      ? { ...baseEnv, ...buildCredentialEnvVars(request.api_credentials) }
+      : { ...baseEnv };
     if (request.api_credentials) {
-      execEnv = buildCredentialEnvVars(request.api_credentials);
       console.log(
         `[mission] Using per-request credentials for provider: ${request.api_credentials.provider}`,
       );
@@ -280,9 +283,7 @@ export async function executeMissionTask(
       }
 
       // Execute turn
-      const proc = execEnv
-        ? await sandbox.startProcess(command, { env: execEnv })
-        : await sandbox.startProcess(command);
+      const proc = await sandbox.startProcess(command, { env: execEnv });
 
       await waitForProcess(proc, turnTimeout);
 
@@ -295,9 +296,7 @@ export async function executeMissionTask(
       if (exitCode !== 0 && stderr.includes('Unknown agent')) {
         console.warn(`[mission] Agent '${agentId}' not found, retrying with default agent`);
         const fallbackCommand = `openclaw agent --agent 'main' --session-id '${sessionId}' --message '${escapedPrompt}'`;
-        const fallbackProc = execEnv
-          ? await sandbox.startProcess(fallbackCommand, { env: execEnv })
-          : await sandbox.startProcess(fallbackCommand);
+        const fallbackProc = await sandbox.startProcess(fallbackCommand, { env: execEnv });
         await waitForProcess(fallbackProc, turnTimeout - (Date.now() - turnStart));
         const fallbackLogs = await fallbackProc.getLogs();
         stdout = fallbackLogs.stdout || '';
@@ -306,6 +305,9 @@ export async function executeMissionTask(
       }
 
       const turnDuration = Date.now() - turnStart;
+
+      // Strip known harmless Node.js deprecation warnings from stderr
+      stderr = stderr.replace(/\(node:\d+\) \[DEP\d+\] DeprecationWarning:.*\n?(\(Use `node --trace-deprecation .*\n?)?/g, '').trim();
 
       // Track stderr for error reporting
       if (stderr) {
