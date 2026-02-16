@@ -307,7 +307,12 @@ export async function executeMissionTask(
       const turnDuration = Date.now() - turnStart;
 
       // Strip known harmless Node.js deprecation warnings from stderr
-      stderr = stderr.replace(/\(node:\d+\) \[DEP\d+\] DeprecationWarning:.*\n?(\(Use `node --trace-deprecation .*\n?)?/g, '').trim();
+      stderr = stderr
+        .replace(
+          /\(node:\d+\) \[DEP\d+\] DeprecationWarning:.*\n?(\(Use `node --trace-deprecation .*\n?)?/g,
+          '',
+        )
+        .trim();
 
       // Track stderr for error reporting
       if (stderr) {
