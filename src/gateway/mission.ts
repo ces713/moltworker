@@ -460,7 +460,7 @@ function reframeSoulContent(soulContent: string): string {
   // Soften MUST mandates in output format instructions
   content = content.replace(
     /Your first line \*\*MUST\*\* be one of these exact verdicts:/gi,
-    'Expected output — first line should be one of:',
+    'Expected output — first line must be one of:',
   );
 
   return content;
