@@ -490,7 +490,7 @@ function buildFirstTurnPrompt(request: MissionExecuteRequest, isMultiTurn: boole
 
 ${request.task_description || 'No additional description provided.'}`);
 
-  // Detect if this task needs action block instructions
+  // Detect if this task needs full action block instructions (kickoff/planning tasks)
   const needsActionBlocks = detectActionBlockTask(request);
   if (needsActionBlocks) {
     sections.push(`# Action Block Format
@@ -503,6 +503,7 @@ Mission Control will parse and execute these on your behalf.
 {"action":"create_task","ref":"T1","subject":"Task title","description":"Detailed description","priority":8,"assign_to":"architect"}
 {"action":"create_task","ref":"T2","subject":"Another task","description":"...","priority":7,"assign_to":"backend"}
 {"action":"add_dependency","task_ref":"T2","blocked_by_ref":"T1"}
+{"action":"save_file","path":"technical/architecture.md","content":"# Architecture\\n\\n..."}
 [ACTIONS_END]
 \`\`\`
 
@@ -513,6 +514,26 @@ Mission Control will parse and execute these on your behalf.
 - \`priority\` range: 1 (lowest) to 10 (highest)
 - Maximum 20 actions per block
 - Always include the action block BEFORE your \`[TASK_COMPLETE]\` marker`);
+  } else {
+    // Standard deliverable instructions — injected for ALL agents on ALL tasks
+    sections.push(`# Saving Deliverables & Memory
+
+When your task produces a document, report, spec, or other deliverable, save it to the project workspace using an action block:
+
+\`\`\`
+[ACTIONS_BEGIN]
+{"action":"save_file","path":"technical/site-structure.md","content":"# Site Structure\\n\\n...full markdown content..."}
+{"action":"save_memory","content":"Key learning or context to remember for future tasks"}
+[ACTIONS_END]
+\`\`\`
+
+**Rules:**
+- \`path\` is relative to the project workspace (e.g. \`technical/architecture.md\`, \`reports/security-audit.md\`)
+- Content should be complete markdown — this becomes the actual file
+- One JSON object per line (JSONL format)
+- Multiple actions allowed (max 20 per block)
+- Place the action block BEFORE your \`[TASK_COMPLETE]\` marker
+- Use \`save_memory\` for key learnings you want to persist across tasks`);
   }
 
   // Instructions — multi-turn includes completion markers
