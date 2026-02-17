@@ -44,6 +44,7 @@ export interface MissionExecuteRequest {
   project_document_index?: string; // INDEX.md
   project_context?: string; // CONTEXT.md - project scope, objectives, quality bar, plan
   api_credentials?: ApiCredentials; // Per-request API credentials from Mission Control
+  github_token?: string; // GitHub PAT for repository access
   max_iterations?: number; // Multi-turn: max LLM turns per execution (default: 1 = single-shot)
 }
 
@@ -233,6 +234,12 @@ export async function executeMissionTask(
       console.log(
         `[mission] Using per-request credentials for provider: ${request.api_credentials.provider}`,
       );
+    }
+
+    // Inject GitHub token if provided (for repository access)
+    if (request.github_token) {
+      execEnv.GITHUB_TOKEN = request.github_token;
+      execEnv.GH_TOKEN = request.github_token; // gh CLI uses this
     }
 
     console.log(
@@ -734,6 +741,7 @@ export function validateMissionRequest(
         typeof req.project_document_index === 'string' ? req.project_document_index : undefined,
       project_context: typeof req.project_context === 'string' ? req.project_context : undefined,
       api_credentials: validateApiCredentials(req.api_credentials),
+      github_token: typeof req.github_token === 'string' ? req.github_token : undefined,
       max_iterations:
         typeof req.max_iterations === 'number'
           ? Math.max(1, Math.min(Math.floor(req.max_iterations), 5))
