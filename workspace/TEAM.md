@@ -13,58 +13,18 @@
 
 ## Model Tiers
 
-- **Leadership Tier** (Opus 4.6, 1M context): Jarvis, Architect - complex reasoning, full codebase visibility
-- **Standard Tier** (Sonnet 4.5, 200K context): Backend, Frontend, Reviewer, Hawk - implementation work
-- **Economy Tier** (Kimi K2.5, 128K context): Heartbeat checks, simple queries
+- **Leadership Tier** (Grok 4.1, 131K context): Complex reasoning, full codebase visibility
+- **Standard Tier** (Grok 4.1 Fast, 131K context): Implementation work
+- **Economy Tier** (Grok 3 Mini, 131K context): Simple tasks, heartbeat checks
 
-## Inter-Agent Communication Protocol
+## Inter-Agent Communication
 
-### Checking Your Inbox
+### Inbox (Automatic)
 
-Before starting any task, check for pending messages:
-
-```
-GET /api/agents/{your-id}/inbox
-```
-
-**Rules:**
-- High-priority questions (priority >= 7) should be answered FIRST
-- Read all pending messages before claiming new work
-- Don't let questions sit unanswered for more than one heartbeat cycle
-
-### Asking Questions
-
-When you need input from another agent:
-
-1. **POST to their inbox** with your task_id so your task gets blocked:
-   ```
-   POST /api/agents/{target-agent}/inbox
-   {
-     "type": "question",
-     "content": "Your specific question here",
-     "task_id": "your-current-task-id",
-     "priority": 7
-   }
-   ```
-
-2. **Wait for the answer** - DO NOT guess or assume
-3. The heartbeat will create an answer task for them automatically
-4. Your task will be unblocked when they respond
-
-### Answering Questions
-
-When responding to a question:
-
-1. Reference the original `message_id` in your response
-2. Be **specific and actionable** - vague answers cause delays
-3. Include code snippets, file paths, or diagrams when helpful
-
-```
-POST /api/agents/{asking-agent}/inbox/{message-id}/answer
-{
-  "content": "Your detailed answer here"
-}
-```
+The heartbeat system manages your inbox automatically:
+- Pending questions are delivered as **priority-9 answer tasks**
+- Answer the question in your task output — the system routes it back
+- High-priority questions (priority >= 7) are answered FIRST
 
 ### Message Types
 
@@ -75,6 +35,82 @@ POST /api/agents/{asking-agent}/inbox/{message-id}/answer
 | `handoff` | Passing work to another agent |
 | `info` | FYI - no response needed |
 
+## Action Blocks (Creating Tasks & Dependencies)
+
+**DO NOT use HTTP API calls.** Agents are text-only. To create tasks or wire
+dependencies, emit an action block at the end of your output:
+
+```
+[ACTIONS_BEGIN]
+{"action":"create_task","ref":"design","subject":"Design auth API","priority":7,"assign_to":"architect"}
+{"action":"create_task","ref":"impl","subject":"Implement auth API","priority":5,"assign_to":"backend"}
+{"action":"add_dependency","task_ref":"impl","blocked_by_ref":"design"}
+[ACTIONS_END]
+```
+
+### create_task fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `ref` | yes | Label for referencing in add_dependency (not stored) |
+| `subject` | yes | Task title (max 200 chars) |
+| `description` | no | Details (max 5000 chars) |
+| `priority` | no | 1-10 (default 5) |
+| `assign_to` | no | Agent ID: jarvis, architect, backend, frontend, reviewer, hawk |
+| `project_id` | no | Inherits from parent task if omitted |
+
+### add_dependency fields
+
+| Field | Description |
+|-------|-------------|
+| `task_ref` / `blocked_by_ref` | Use ref labels from create_task |
+| `task_id` / `blocked_by_id` | Or use real task IDs for existing tasks |
+
+### save_memory fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `content` | yes | Text to append to your persistent agent memory |
+
+Example:
+```
+{"action":"save_memory","content":"Project X uses PostgreSQL 16 with pgvector for embeddings"}
+```
+
+### update_project_context fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `content` | yes | Text to append to the project's shared context |
+| `project_id` | no | Inherits from parent task if omitted |
+
+Example:
+```
+{"action":"update_project_context","content":"Decided to use JWT auth with 15min access tokens and 7-day refresh tokens"}
+```
+
+### save_file fields
+
+Write standalone files to the project workspace (R2). Use this for deliverables, specs, and any document that should exist as its own file.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `path` | yes | Relative path within the workspace (max 200 chars, no `..` or absolute paths) |
+| `content` | yes | File content (max 100KB) |
+
+- Files are written to `projects/{project_id}/workspace/{path}` in R2
+- Metadata is attached automatically: `agent_id`, `phase_id`, `task_id`
+- Use for deliverables like specs, ADRs, reports — anything that should be a standalone file
+- Use `update_project_context` only for brief notes/decisions, not full documents
+
+Examples:
+```
+{"action":"save_file","path":"technical/site-structure.md","content":"# Site Structure\n\n## Pages\n- Home\n- About\n..."}
+{"action":"save_file","path":"architecture/adr-001-auth.md","content":"# ADR-001: Authentication Strategy\n\n## Decision\nUse JWT..."}
+```
+
+**Limits:** max 20 actions per block. Errors never fail the parent task.
+
 ## Task Handoff Protocol
 
 ### Workflow Dependencies
@@ -82,35 +118,6 @@ POST /api/agents/{asking-agent}/inbox/{message-id}/answer
 1. **Architecture First**: Architecture/design tasks should complete before implementation
 2. **Security Review**: Hawk reviews security-sensitive changes before merge
 3. **Code Review**: Reviewer approves all PRs before Jarvis merges
-
-### Standard Task Flow
-
-```
-Jarvis creates task
-        ↓
-Architect designs (if needed)
-        ↓
-Backend/Frontend implements
-        ↓
-Reviewer reviews code
-        ↓
-Hawk reviews security (if applicable)
-        ↓
-Jarvis merges PR
-```
-
-### Creating Task Dependencies
-
-When creating tasks that depend on each other:
-
-1. Create the blocking task first (e.g., architecture design)
-2. Create the dependent task second (e.g., implementation)
-3. Add dependency:
-   ```
-   POST /api/tasks/{impl-id}/dependencies
-   { "blocked_by_task_id": "{arch-id}" }
-   ```
-4. The dependent task won't be assigned until the blocker completes
 
 ## Who To Ask For What
 
@@ -167,25 +174,40 @@ The heartbeat service automatically escalates:
 - Dependencies stuck for more than 24 hours
 - High-priority messages unanswered for more than 2 hours
 
+## Methodology-Driven Projects
+
+Projects can be assigned a methodology (agile-sprint, kanban, waterfall, etc.).
+When a project has a methodology:
+
+- **Jarvis** receives the methodology YAML as context and orchestrates work by phases/gates
+- Each phase defines which agents participate, deliverables, and gate criteria
+- Other agents should complete deliverables as defined by their assigned phase
+- Phase gates require Jarvis approval before the next phase begins
+
+Available methodologies: agile-sprint, kanban, waterfall, content-editorial,
+business-process, marketing-campaign, seo-audit, ios-app-development.
+
 ## Context Sharing
 
-### Project Context
+### How Context Works
 
-Every agent should read before starting work on a project:
-1. `projects/{project-id}/CONTEXT.md` - Current state and decisions
-2. `projects/{project-id}/ACCESS.md` - Your permissions
+Mission Control automatically injects relevant context into your prompt for each task:
+- **Soul file** — your role-specific instructions
+- **TEAM.md** (this file) — shared protocols
+- **Agent memory** — your persistent notes across tasks
+- **Project context** — project memory, communications, document index, methodology
+- **Task details** — current task with description, priority, dependencies
+
+You do not need to read files manually — everything relevant is provided in your prompt.
 
 ### Updating Context
 
-When you make significant decisions or discoveries:
-```markdown
-### {agent-id} - {DATE} - {Brief Title}
+Use action blocks to persist important information:
 
-{Your update - decisions made, blockers resolved, patterns discovered}
-```
-
-Update the "Last updated by" header when modifying CONTEXT.md.
+- **`save_memory`** — personal agent memory (spans projects)
+- **`update_project_context`** — brief project-level notes visible to all agents
+- **`save_file`** — standalone deliverable files in the project workspace
 
 ---
 
-*"Alone we can do so little; together we can do so much." - But with clear protocols.*
+*This is the git-tracked reference copy. The authoritative version is generated by `POST /api/team/sync`.*
