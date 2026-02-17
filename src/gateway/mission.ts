@@ -42,6 +42,7 @@ export interface MissionExecuteRequest {
   project_memory?: string; // Project-specific learnings
   project_communications?: string; // COMMS.md
   project_document_index?: string; // INDEX.md
+  project_context?: string; // CONTEXT.md - project scope, objectives, quality bar, plan
   api_credentials?: ApiCredentials; // Per-request API credentials from Mission Control
   max_iterations?: number; // Multi-turn: max LLM turns per execution (default: 1 = single-shot)
 }
@@ -469,6 +470,11 @@ function buildFirstTurnPrompt(request: MissionExecuteRequest, isMultiTurn: boole
     sections.push(`# Available Project Documents\n\n${request.project_document_index}`);
   }
 
+  // Project context (CONTEXT.md) if provided
+  if (request.project_context) {
+    sections.push(`# Project Context\n\n${request.project_context}`);
+  }
+
   // Methodology context for orchestrators
   if (request.methodology_context) {
     sections.push(`# Methodology\n\n${request.methodology_context}`);
@@ -677,6 +683,8 @@ export function validateMissionRequest(
         typeof req.project_communications === 'string' ? req.project_communications : undefined,
       project_document_index:
         typeof req.project_document_index === 'string' ? req.project_document_index : undefined,
+      project_context:
+        typeof req.project_context === 'string' ? req.project_context : undefined,
       api_credentials: validateApiCredentials(req.api_credentials),
       max_iterations:
         typeof req.max_iterations === 'number'
