@@ -683,8 +683,7 @@ export function validateMissionRequest(
         typeof req.project_communications === 'string' ? req.project_communications : undefined,
       project_document_index:
         typeof req.project_document_index === 'string' ? req.project_document_index : undefined,
-      project_context:
-        typeof req.project_context === 'string' ? req.project_context : undefined,
+      project_context: typeof req.project_context === 'string' ? req.project_context : undefined,
       api_credentials: validateApiCredentials(req.api_credentials),
       max_iterations:
         typeof req.max_iterations === 'number'
